@@ -42,6 +42,33 @@ async function ensureExternalResources(): Promise<void> {
   } catch {}
 }
 
+// 确保外部基础资源存在（网络与命名卷）
+async function ensureExternalInfraResources(): Promise<void> {
+  // 网络
+  try {
+    const { stdout } = await run('docker network ls --format "{{.Name}}"');
+    const names = new Set(stdout.split(/\r?\n/).filter(Boolean));
+    if (!names.has('ai-server-net')) {
+      await run('docker network create ai-server-net');
+    }
+  } catch {}
+  // 基础命名卷
+  const volumes = [
+    'ai-server-mysql-data',
+    'ai-server-redis-data',
+    'ai-server-minio-data',
+    'ai-server-es-data',
+    'ai-server-logs',
+  ];
+  try {
+    const { stdout } = await run('docker volume ls --format "{{.Name}}"');
+    const vset = new Set(stdout.split(/\r?\n/).filter(Boolean));
+    for (const v of volumes) {
+      if (!vset.has(v)) await run(`docker volume create ${v}`);
+    }
+  } catch {}
+}
+
 export async function firstStartModule(name: ModuleName): Promise<IpcResponse> {
   const running = await dockerRunning();
   const compose = await pickComposeCommand();
@@ -57,13 +84,10 @@ export async function firstStartModule(name: ModuleName): Promise<IpcResponse> {
 }
 
 export async function startModule(name: ModuleName): Promise<IpcResponse> {
-  // 1) 预检
-  const running = await dockerRunning();
+  // 确保外部网络与命名卷存在（幂等）
+  await ensureExternalInfraResources();
   const compose = await pickComposeCommand();
-  if (!running) return { success: false, message: 'Docker 未运行' };
   if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
-
-  // 2) 解析注册表与依赖
   const reg = loadRegistry();
   const modules = reg.modules || [];
   const target = modules.find(m => m.name === name);
