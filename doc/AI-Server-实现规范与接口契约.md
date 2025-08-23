@@ -5,7 +5,22 @@
 更新时间：2025-08-23
 适用平台：Windows 10（主）、macOS（次）
 
----
+## 0. 开发模式调整与最小化原型
+
+为配合新的开发计划，首先交付一个 Electron 最小化原型（单窗口）。该原型仅包含：
+
+- 环境检测面板：检测 Docker/Compose 安装与运行、Docker Desktop 可启动性、Node/npm/PowerShell 版本、基本端口可用性抽检。
+- 基础服务模块列表（basic）：展示并操作基础服务（如 MySQL/Postgres/Redis/MinIO/OpenSearch/Elasticsearch/Valkey/Weaviate 等）的映射端口、运行状态、启动、停止、清空缓存后启动。
+- 功能模块列表（feature）：展示并操作 `dify`、`ragflow`、`n8n`、`oneapi` 等模块的映射端口、运行状态、启动、停止、清空缓存后启动。
+
+实施约束：
+
+- UI 端操作必须通过 JS 直接调用主进程（IPC -> Docker/Compose），禁止在渲染进程中调用 PowerShell 脚本。
+- 每完成一个系统模块（无论 basic 还是 feature）的容器化与启停能力，都需要在仓库中新增对应的 PowerShell 辅助脚本（`start-<module>.ps1`、`stop-<module>.ps1`）供人工/CI 使用；但 UI 不调用这些脚本。
+- 完成并自测一个模块后，将该模块操作集（设置端口/启停/清理）接入 UI，再进入下一个模块开发与验收。
+
+本章为优先交付范围；容器管理的完整实现继续遵循《实施方案》。
+
 
 ## 1. 目录与术语
 - 应用：Electron 应用，本项目。
@@ -74,12 +89,18 @@
 ## 4. IPC 契约（主进程 <-> 渲染进程）
 统一以 `ipcMain.handle` + `ipcRenderer.invoke` 实现，所有响应返回 `{ success: boolean, message?: string, data?: any }`。
 
+- `ai/env/diagnose` -> 环境检测（最小原型）
+  - 入参：无
+  - 出参：`{ docker: { installed: boolean, running: boolean, compose: 'docker compose'|'docker-compose'|null, version?: string }, node?: string, npm?: string, powershell?: string, issues: string[] }`
 - `ai/docker/checkDocker` -> 检查 Docker 安装与运行
   - 入参：无
   - 出参：`{ installed: boolean, running: boolean, version: string }`
 - `ai/docker/startDocker` -> 启动 Docker Desktop（视平台）
   - 入参：无
   - 出参：`{ success, message? }`
+- `ai/modules/list` -> 列出所有模块
+  - 入参：`{ type?: 'basic'|'feature'|'all' }`
+  - 出参：`{ items: Array<{ name: string, type: 'basic'|'feature' }> }`
 - `ai/module/start`
   - 入参：`{ name: 'dify'|'ragflow'|'n8n'|'oneapi' }`
   - 出参：`{ success, message? }`
@@ -116,7 +137,7 @@
 3. `.env`（仅用于 compose 引擎需要的外部变量，如 RagFlow 端口/NLTK_HOST_DIR）
 
 ### 5.3 生成器算法（伪码）
-```
+```javascript
 function generateComposeFromTemplate(module, mergedConfig) {
   // 1. 读取模板文本 docker-compose/<module>.template.yml
   // 2. 准备上下文 ctx：
@@ -124,6 +145,7 @@ function generateComposeFromTemplate(module, mergedConfig) {
   //    - PORTS: mergedConfig.ports
   //    - ENV: mergedConfig.env
   //    - NLTK_HOST_DIR: {repo}/third_party/nltk_data （若模块为 ragflow）
+  //    - MODULE_TYPE: 'basic' | 'feature'（用于区分模板或策略）
   // 3. 对 ctx 中的所有路径执行 windowsPathToPosix()
   // 4. 执行字符串替换生成最终文本
   // 5. 输出到 {userData}/docker-compose/<module>.yml
@@ -156,6 +178,28 @@ function generateComposeFromTemplate(module, mergedConfig) {
   - 启动 Docker 最长 30s；
   - `compose up`/`down` 报错将原始输出回传 UI；
   - `getContainerStatus` 优先 `compose ps -q`，失败回退 label/name 策略。
+
+最小原型阶段的操作覆盖：
+
+- 基础服务（basic）与功能模块（feature）均支持：检查状态、启动、停止、清空缓存后启动。
+- “设置模块对外映射端口”通过 `ai/config/set` 写入 `ports` 后再执行 `start` 生效；渲染端需做端口占用预检与冲突提示。
+
+### 6.1 UI 按钮语义（严格依赖处理）
+
+- 启动（Start）：
+  - 基础服务模块（basic）：仅启动自身。
+  - 功能模块（feature）：先检查自身依赖的基础服务模块是否全部运行；若有未运行则按依赖顺序启动之，待所有依赖 healthy 后再启动自身。
+- 停止（Stop）：
+  - 基础服务模块（basic）：先检查是否存在正在运行且依赖该基础服务的功能模块；若存在则返回错误并不停止；若不存在则停止自身。
+  - 功能模块（feature）：停止自身；随后遍历其依赖的基础服务，判断是否仍被其他运行中的功能模块使用；若无人使用则可选择停止对应基础服务（默认不自动停止，可作为“智能回收”选项）。
+
+上述语义需由主进程实现，并通过 IPC 提供给渲染端；渲染端仅触发动作与展示结果。
+
+### 6.2 PS1 脚本一致性
+
+- 每个模块（包含基础服务与功能模块）都需提供 `start-<module>.ps1` 与 `stop-<module>.ps1` 供人工/CI 使用。
+- PowerShell 脚本的启动/停止逻辑必须与本节 UI 按钮语义保持一致的依赖处理与安全检查。
+- UI 不调用 ps1；UI 通过 JS/IPC 直接操作 Docker/Compose。
 
 ---
 
@@ -194,6 +238,12 @@ function generateComposeFromTemplate(module, mergedConfig) {
 - Dify：全栈模板变量替换正确，容器健康检查通过（api/worker/web 等）。
 - `getContainerStatus`：在缺少 compose 文件情况下可通过 label/name 检测到状态。
 - 清理缓存：compose 缓存文件删除，`docker rm -f` 回退逻辑可用，数据目录可选清理（危险操作需确认）。
+- 环境检测：`ai/env/diagnose` 能准确识别 Docker/Compose、Node/npm/PowerShell 版本与潜在问题列表。
+- 模块列表：`ai/modules/list` 能区分 basic/feature，并与 UI 列表一致。
+
+PowerShell 脚本（仅用于人工/CI，不被 UI 调用）：
+
+- 为每个模块提供 `start-<module>.ps1` / `stop-<module>.ps1`，并在 CI 脚本中调用以验证最低可用性；UI 通过 JS/IPC 直接操作 Docker/Compose。
 
 ---
 
@@ -210,15 +260,22 @@ RAGFLOW_API_PORT=7861
 ## 12. 代码生成要求
 - 主进程：
   - 在 `src/main/docker/index.ts` 实现：
-    - `checkDocker()`、`startDocker()`、`startContainer()`、`stopContainer()`、`getContainerStatus()`、`clearModuleCache()`。
+    - `checkDocker()`、`startDocker()`、`startContainer()`、`stopContainer()`、`getContainerStatus()`、`clearModuleCache()`、`listModules()`、`envDiagnose()`。
     - Compose 命令解析与缓存：优先 `docker compose`，回退 `docker-compose`。
   - 在 `src/main/docker/template.ts` 实现模板替换：
     - 路径正斜杠化；各模块占位符替换；输出到 `{userData}/docker-compose/`。
 - 渲染进程：
-  - 四个设置页（Dify、RagFlow、n8n、OneAPI）；统一组件风格；表单校验与保存。
-  - 日志面板与状态展示；一键启动 Docker。
+  - 单窗口最小原型：环境检测面板、基础服务列表、功能模块列表与操作区。
+  - 后续扩展为四个设置页（Dify、RagFlow、n8n、OneAPI）；统一组件风格；表单校验与保存。
+  - 日志面板与状态展示；一键启动 Docker；端口占用预检与风险提示。
 - 模板：
   - `docker-compose/*.template.yml` 与 `.env` 示例齐全，对齐“实施方案”的版本矩阵。
+
+编码与模块化（硬性要求）：
+
+- 禁止“上帝类/上帝文件”；主进程与渲染进程均需按模块拆分（如 `src/main/docker/*`, `src/main/config/*`, `src/renderer/modules/*`）。
+- 单个代码文件不超过 400 行；如接近限制，必须进一步拆分模块或提炼公共库。
+- 保持平台兼容：Windows 10 与 macOS 均需通过；路径/进程/权限差异需在主进程适配层统一处理。
 
 ---
 
@@ -231,9 +288,11 @@ RAGFLOW_API_PORT=7861
 
 ## 14. 交付清单（写代码AI应输出）
 - 主进程与渲染进程完整代码（含 IPC）。
+- 单窗口最小原型（环境检测 + 基础服务/功能模块列表与操作）。
 - 4 份 compose 模板与 `.env` 示例。
 - 端到端运行脚本与测试用例。
 - README：启动指引与常见问题。
+- 每模块 `start-<module>.ps1` / `stop-<module>.ps1`（供人工/CI），且在 README 中注明：UI 以 JS/IPC 直接操作，不调用 ps1。
 
 ---
 
