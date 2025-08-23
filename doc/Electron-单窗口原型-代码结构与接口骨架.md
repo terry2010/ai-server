@@ -132,6 +132,14 @@ export const IPC = {
   - `E_RUNTIME`：其他运行时错误
 - ModuleStatus 补充：`errorCode?: string; errorDetail?: string`
 
+首次启动相关错误码：
+
+- `E_PREFLIGHT_RESOURCE`：资源不足（CPU/内存/磁盘）
+- `E_EXT_CONN_FAIL`：外部 DB/Redis 连通性失败
+- `E_IMAGE_PULL`：镜像拉取失败
+- `E_INIT_SCRIPT`：初始化/迁移脚本失败
+- `E_FIRST_RUN_ABORTED`：用户中止首次启动
+
 ---
 
 ## 4. 主进程骨架
@@ -251,6 +259,15 @@ export const useModuleStore = defineStore('modules', {
 
 - 端口校验：`a-form` 自定义异步校验器，调用 IPC `ai/module/validatePorts`（或在 `ModuleStart` 前统一校验）
 - 健康等待：启动后轮询 `ModuleStatus` 或由主进程返回 `progress`（可后续扩展事件通道），当前版本以主进程阻塞等待后再返回成功
+
+### 首次启动向导与日志查看
+
+- 向导式提示：展示“镜像准备 → 依赖启动 → 初始化 → 健康检查”的进度条；可中止。
+- 错误呈现：以错误码 + 详细信息形式展示，并提供“查看日志”按钮。
+- 日志查看：
+  - UI 提供 `LogsPanel.vue` 打开模块日志（或打开日志目录）。
+  - 日志位置与挂载规范见《实施方案》9.1；主进程可返回日志路径。
+- 成功输出：首次启动完成后在 UI 显示连接信息（URL/端口/默认账号等），并提示尽快修改默认密码。
 
 ---
 
