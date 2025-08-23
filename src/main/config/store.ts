@@ -73,7 +73,7 @@ export function loadRegistry(): RegistryLoadResult {
 const GLOBAL_CONFIG_FILE = () => path.join(getUserDataDir(), 'config.json');
 
 export function getGlobalConfig(): GlobalConfig {
-  const def: GlobalConfig = { bindAddress: '127.0.0.1', autoStartDeps: true, autoSuggestNextPort: true, logToConsole: true };
+  const def: GlobalConfig = { bindAddress: '127.0.0.1', autoStartDeps: true, autoSuggestNextPort: true, logToConsole: true, ...( { autoStopUnusedDeps: false } as any) } as any;
   const obj = readJsonSafe(GLOBAL_CONFIG_FILE());
   return { ...def, ...(obj?.global || {}) } as GlobalConfig;
 }

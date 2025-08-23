@@ -2,6 +2,7 @@ import type { ModuleName, ModuleStatus, IpcResponse, ModuleType } from '../../sh
 import { IPC } from '../../shared/ipc-contract';
 import { dockerRunning, pickComposeCommand, run, isTcpOpen } from './utils';
 import { loadRegistry } from '../config/store';
+import { getGlobalConfig } from '../config/store';
 import * as path from 'node:path';
 import type { WebContents } from 'electron';
 import { waitHealth } from './health';
@@ -164,7 +165,18 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
       if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败', data: { logs } };
     }
   } else {
-    // basic 模块：直接 stop，但不自动 down，避免误删共享资源
+    // basic 模块：在停止前进行占用检查——若仍被运行中的 feature 依赖，阻止
+    const reg2 = loadRegistry();
+    const modules2 = reg2.modules || [];
+    const users = modules2.filter(m => m.type === 'feature' && (m.dependsOn || []).includes(name));
+    if (users.length > 0) {
+      const runningSet = await listRunningContainerNames();
+      const inUse = users.some(u => runningSet.has(containerNameFor(u.name)));
+      if (inUse) {
+        return { success: false, code: 'E_IN_USE', message: `基础服务 ${name} 仍被运行中的功能模块依赖，已阻止停止。` };
+      }
+    }
+    // 通过占用检查后再 stop（不 down，避免误删共享资源）
     const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
     {
       const r = await composeStop(infraCompose, [serviceNameFor(name)]);
@@ -179,18 +191,21 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
       await execAndLog(`docker stop ${cname}`, logs);
     }
   } catch {}
-  // 依赖感知回收：若目标是 feature，则尝试回收其依赖中未被其它运行模块占用的 basic
+  // 依赖感知回收（可选）：仅当全局开关 autoStopUnusedDeps=true 才尝试停止未被占用的基础服务
   try {
-    const deps = (target.dependsOn || []) as ModuleName[];
-    if (deps.length > 0) {
-      const runningNames = await listRunningContainerNames();
-      const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
-      for (const dep of deps) {
-        const users = modules.filter(m => m.name !== name && (m.dependsOn || []).includes(dep));
-        // 判断用户模块是否有运行中的容器（简单以服务名或容器名包含模块名匹配）
-        const inUse = users.some(u => Array.from(runningNames).some(n => n.includes(serviceNameFor(u.name))));
-        if (!inUse) {
-          await execAndLog(`${compose} -f ${infraCompose} stop ${serviceNameFor(dep)}`, logs);
+    const { autoStopUnusedDeps } = getGlobalConfig() as any;
+    if (autoStopUnusedDeps) {
+      const deps = (target.dependsOn || []) as ModuleName[];
+      if (deps.length > 0) {
+        const runningNames = await listRunningContainerNames();
+        const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
+        for (const dep of deps) {
+          const users = modules.filter(m => m.name !== name && m.type === 'feature' && (m.dependsOn || []).includes(dep));
+          // 精确判断：是否存在运行中的依赖者（按容器名精确匹配）
+          const inUse = users.some(u => runningNames.has(containerNameFor(u.name)));
+          if (!inUse) {
+            await execAndLog(`${compose} -f ${infraCompose} stop ${serviceNameFor(dep)}`, logs);
+          }
         }
       }
     }
@@ -369,6 +384,15 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
     const r = await composeStopStream(featureCompose, [serviceNameFor(name)], sender, streamId);
     if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败' };
   } else {
+    // basic 模块：在停止前进行占用检查——若仍被运行中的 feature 依赖，阻止
+    const users = modules.filter(m => m.type === 'feature' && (m.dependsOn || []).includes(name));
+    if (users.length > 0) {
+      const runningSet = await listRunningContainerNames();
+      const inUse = users.some(u => runningSet.has(containerNameFor(u.name)));
+      if (inUse) {
+        return { success: false, code: 'E_IN_USE', message: `基础服务 ${name} 仍被运行中的功能模块依赖，已阻止停止。` };
+      }
+    }
     const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
     const r2 = await composeStopStream(infraCompose, [serviceNameFor(name)], sender, streamId);
     if (!r2.ok) return { success: false, code: r2.code as any, message: r2.message || '停止模块失败' };
@@ -377,6 +401,26 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
     const cname = containerNameFor(name);
     const set = await listRunningContainerNames();
     if (set.has(cname)) await spawnStream(`docker stop ${cname}`, sender, streamId);
+  } catch {}
+  // 依赖感知回收（可选）：仅当全局开关 autoStopUnusedDeps=true 才尝试停止未被占用的基础服务（仅 feature 停止时考虑）
+  try {
+    if (target.type === 'feature') {
+      const { autoStopUnusedDeps } = getGlobalConfig() as any;
+      if (autoStopUnusedDeps) {
+        const deps = (target.dependsOn || []) as ModuleName[];
+        if (deps.length > 0) {
+          const runningNames = await listRunningContainerNames();
+          const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
+          for (const dep of deps) {
+            const users = modules.filter(m => m.name !== name && m.type === 'feature' && (m.dependsOn || []).includes(dep));
+            const inUse = users.some(u => runningNames.has(containerNameFor(u.name)));
+            if (!inUse) {
+              await composeStopStream(infraCompose, [serviceNameFor(dep)], sender, streamId);
+            }
+          }
+        }
+      }
+    }
   } catch {}
   return { success: true, message: `stop ${name} OK` };
 }

@@ -128,28 +128,28 @@
 模板放置在 `docker-compose/*.template.yml`，通过 `src/main/docker/template.ts` 生成。
 
 ### 5.1 占位符写法
-- `${VAR}` 统一由生成器替换。
+- `${VAR}`：从变量字典取值，若不存在则报错 `E_VAR_MISSING`（主进程返回 `code` 与缺失项列表）。
+- `${VAR:default}`：同上，但若未提供变量，则使用 `default` 字面量作为回退值（不会报错）。
 - 路径必须在替换前做 Windows 正斜杠化（`C:\\path\\to` -> `C:/path/to`）。
 
-### 5.2 变量来源优先级
-1. `moduleConfig.env` / `moduleConfig.ports` / `moduleConfig.dataDir`
-2. 默认值（`getDefaultModuleConfig(module)`）
-3. `.env`（仅用于 compose 引擎需要的外部变量，如 RagFlow 端口/NLTK_HOST_DIR）
+### 5.2 变量来源与优先级（主进程合并字典）
+变量字典由三部分按“后者覆盖前者”的顺序合并：
+1. 模块注册表 `registry.byName[module].variables`（如端口、网络名、数据目录等默认变量）
+2. 全局配置 `getGlobalConfig()`（如绑定地址 `bindAddress` 等）
+3. 进程环境变量 `process.env`
 
-### 5.3 生成器算法（伪码）
+说明：
+- 任何非字符串值会被转为字符串写入 YAML。
+- 未提供值且无默认（`${VAR}`）将收集到缺失列表并返回错误 `E_VAR_MISSING`。
+
+### 5.3 生成器与合并策略（摘要）
 ```javascript
 function generateComposeFromTemplate(module, mergedConfig) {
-  // 1. 读取模板文本 docker-compose/<module>.template.yml
-  // 2. 准备上下文 ctx：
-  //    - DATA_DIR: mergedConfig.dataDir 或 {userData}/data/<module>
-  //    - PORTS: mergedConfig.ports
-  //    - ENV: mergedConfig.env
-  //    - NLTK_HOST_DIR: {repo}/third_party/nltk_data （若模块为 ragflow）
-  //    - MODULE_TYPE: 'basic' | 'feature'（用于区分模板或策略）
-  // 3. 对 ctx 中的所有路径执行 windowsPathToPosix()
-  // 4. 执行字符串替换生成最终文本
-  // 5. 输出到 {userData}/docker-compose/<module>.yml
-  // 6. 返回 { success: true, filePath }
+  // 1) 读取模板并用 js-yaml 解析为对象
+  // 2) 合并注册表 fragment（支持字符串 YAML 与对象），对象深合并、数组覆盖
+  // 3) 构建变量字典（registry.variables + global + process.env），执行 `${VAR}` / `${VAR:default}` 替换
+  // 4) 校验缺失变量：若存在则返回 { success:false, code:'E_VAR_MISSING', message, data? }
+  // 5) dump 为 YAML，输出到 {userData}/docker-compose/<module>.yml
 }
 ```
 
@@ -209,8 +209,13 @@ function generateComposeFromTemplate(module, mergedConfig) {
   - `E_DOCKER_NOT_INSTALLED`：提示“未安装 Docker，请安装后重试”。
   - `E_DOCKER_NOT_RUNNING`：提示“一键启动 Docker Desktop 或手动启动”。
   - `E_COMPOSE_NOT_FOUND`：提示“未检测到 docker compose 或 docker-compose”。
-  - `E_TEMPLATE_GEN_FAILED`：模板生成失败。
+  - `E_TEMPLATE_MISSING`：模块模板或引用片段缺失。
+  - `E_TEMPLATE_GEN_FAILED`：模板生成失败（兜底）。
+  - `E_VAR_MISSING`：存在 `${VAR}` 未提供值且无默认；`message` 包含缺失变量列表。
   - `E_COMPOSE_UP_FAILED` / `E_COMPOSE_DOWN_FAILED`。
+
+UI 建议：
+- 在 `src/renderer/pages/Home.vue` 中对 `E_TEMPLATE_MISSING`、`E_VAR_MISSING`、`E_RUNTIME` 用 Modal 详细展示错误与命令输出，并提供“一键复制详情”。
 
 ---
 

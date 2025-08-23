@@ -33,7 +33,8 @@ export type ErrorCode =
   | 'E_EXT_CONN_FAIL'
   | 'E_IMAGE_PULL'
   | 'E_INIT_SCRIPT'
-  | 'E_FIRST_RUN_ABORTED';
+  | 'E_FIRST_RUN_ABORTED'
+  | 'E_IN_USE';
 
 export const IPC = {
   EnvDiagnose: 'ai/env/diagnose',
