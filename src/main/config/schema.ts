@@ -32,6 +32,7 @@ export interface GlobalConfig {
   bindAddress: string; // default 127.0.0.1
   autoStartDeps: boolean;
   autoSuggestNextPort: boolean;
+  logToConsole?: boolean; // 是否在前端控制台输出后端执行日志
 }
 
 export interface FirstRunState {

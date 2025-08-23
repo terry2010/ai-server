@@ -1,7 +1,39 @@
 import type { ModuleName, ModuleStatus, IpcResponse, ModuleType } from '../../shared/ipc-contract';
+import { IPC } from '../../shared/ipc-contract';
 import { dockerRunning, pickComposeCommand, run, waitForTcp, waitForHttpOk, isTcpOpen } from './utils';
 import { loadRegistry } from '../config/store';
 import * as path from 'node:path';
+import { spawn } from 'node:child_process';
+import type { WebContents } from 'electron';
+
+type LogEntry = { cmd: string; stdout?: string; stderr?: string };
+
+async function execAndLog(cmd: string, logs: LogEntry[], cwd?: string) {
+  const r = await run(cmd, cwd);
+  logs.push({ cmd, stdout: r.stdout, stderr: r.stderr });
+  return r;
+}
+
+async function spawnStream(cmdline: string, sender: WebContents, streamId: string): Promise<number> {
+  // 通过 shell 启动，便于在 Windows 上运行复合命令
+  sender.send(IPC.ModuleLogEvent, { streamId, event: 'cmd', cmd: cmdline });
+  return await new Promise<number>((resolve) => {
+    const child = spawn(cmdline, { shell: true, windowsHide: true });
+    child.stdout?.on('data', (buf) => {
+      sender.send(IPC.ModuleLogEvent, { streamId, event: 'stdout', chunk: String(buf) });
+    });
+    child.stderr?.on('data', (buf) => {
+      sender.send(IPC.ModuleLogEvent, { streamId, event: 'stderr', chunk: String(buf) });
+    });
+    child.on('close', (code) => {
+      sender.send(IPC.ModuleLogEvent, { streamId, event: 'end', code });
+      resolve(typeof code === 'number' ? code : -1);
+    });
+    child.on('error', (err) => {
+      sender.send(IPC.ModuleLogEvent, { streamId, event: 'error', message: String(err?.message || err) });
+    });
+  });
+}
 
 export interface ModuleItem { name: string; type: ModuleType }
 
@@ -16,13 +48,14 @@ export function listModules(): ModuleItem[] {
 }
 
 // 确保 external 资源存在（首次启动前调用）
-async function ensureExternalResources(): Promise<void> {
+async function ensureExternalResources(logs?: LogEntry[]): Promise<void> {
   // 网络
   try {
     const { stdout } = await run('docker network ls --format "{{.Name}}"');
     const names = new Set(stdout.split(/\r?\n/).filter(Boolean));
     if (!names.has('ai-server-net')) {
-      await run('docker network create ai-server-net');
+      if (logs) await execAndLog('docker network create ai-server-net', logs);
+      else await run('docker network create ai-server-net');
     }
   } catch {}
   // 卷（与 infra compose 中保持一致）
@@ -37,19 +70,23 @@ async function ensureExternalResources(): Promise<void> {
     const { stdout } = await run('docker volume ls --format "{{.Name}}"');
     const vset = new Set(stdout.split(/\r?\n/).filter(Boolean));
     for (const v of volumes) {
-      if (!vset.has(v)) await run(`docker volume create ${v}`);
+      if (!vset.has(v)) {
+        if (logs) await execAndLog(`docker volume create ${v}`, logs);
+        else await run(`docker volume create ${v}`);
+      }
     }
   } catch {}
 }
 
 // 确保外部基础资源存在（网络与命名卷）
-async function ensureExternalInfraResources(): Promise<void> {
+async function ensureExternalInfraResources(logs?: LogEntry[]): Promise<void> {
   // 网络
   try {
     const { stdout } = await run('docker network ls --format "{{.Name}}"');
     const names = new Set(stdout.split(/\r?\n/).filter(Boolean));
     if (!names.has('ai-server-net')) {
-      await run('docker network create ai-server-net');
+      if (logs) await execAndLog('docker network create ai-server-net', logs);
+      else await run('docker network create ai-server-net');
     }
   } catch {}
   // 基础命名卷
@@ -64,28 +101,35 @@ async function ensureExternalInfraResources(): Promise<void> {
     const { stdout } = await run('docker volume ls --format "{{.Name}}"');
     const vset = new Set(stdout.split(/\r?\n/).filter(Boolean));
     for (const v of volumes) {
-      if (!vset.has(v)) await run(`docker volume create ${v}`);
+      if (!vset.has(v)) {
+        if (logs) await execAndLog(`docker volume create ${v}`, logs);
+        else await run(`docker volume create ${v}`);
+      }
     }
   } catch {}
 }
 
 export async function firstStartModule(name: ModuleName): Promise<IpcResponse> {
+  const logs: LogEntry[] = [];
   const running = await dockerRunning();
   const compose = await pickComposeCommand();
   if (!running) return { success: false, message: 'Docker 未运行' };
   if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
   try {
-    await ensureExternalResources();
+    await ensureExternalResources(logs);
   } catch (e: any) {
-    return { success: false, message: `初始化外部资源失败: ${String(e?.message ?? e)}` };
+    return { success: false, message: `初始化外部资源失败: ${String(e?.message ?? e)}`, data: { logs } };
   }
   // 后续沿用正常启动流程（依赖解析、健康检查等）
-  return startModule(name);
+  const res = await startModule(name);
+  // 合并 logs（startModule 内也会带 logs，这里以 startModule 为准）
+  return res;
 }
 
 export async function startModule(name: ModuleName): Promise<IpcResponse> {
+  const logs: LogEntry[] = [];
   // 确保外部网络与命名卷存在（幂等）
-  await ensureExternalInfraResources();
+  await ensureExternalInfraResources(logs);
   const compose = await pickComposeCommand();
   if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
   const reg = loadRegistry();
@@ -130,13 +174,13 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
       if (runningSet.has(cname)) continue; // 已在运行，跳过
       if (allSet.has(cname)) {
         // 已存在但未运行，直接启动容器
-        await run(`docker start ${cname}`);
+        await execAndLog(`docker start ${cname}`, logs);
       } else {
         needUp.push(serviceNameFor(dep));
       }
     }
     if (needUp.length > 0) {
-      await run(`${compose} -f ${infraCompose} up -d --no-recreate ${needUp.join(' ')}`);
+      await execAndLog(`${compose} -f ${infraCompose} up -d --no-recreate ${needUp.join(' ')}`, logs);
     }
     // 3.1 等待依赖健康（基于注册表 healthCheck）
     for (const dep of deps) {
@@ -157,9 +201,9 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
     if (runningSet.has(cname)) {
       // 已在运行，跳过 compose
     } else if (allSet.has(cname)) {
-      await run(`docker start ${cname}`);
+      await execAndLog(`docker start ${cname}`, logs);
     } else {
-      await run(`${compose} -f ${featureCompose} up -d --no-recreate ${serviceNameFor(name)}`);
+      await execAndLog(`${compose} -f ${featureCompose} up -d --no-recreate ${serviceNameFor(name)}` , logs);
     }
   } else {
     // basic 模块：走 infra 文件（同样避免与现存容器冲突）
@@ -170,20 +214,21 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
     if (runningSet.has(cname)) {
       // 已在运行，跳过 compose
     } else if (allSet.has(cname)) {
-      await run(`docker start ${cname}`);
+      await execAndLog(`docker start ${cname}`, logs);
     } else {
-      await run(`${compose} -f ${infraCompose} up -d --no-recreate ${serviceNameFor(name)}`);
+      await execAndLog(`${compose} -f ${infraCompose} up -d --no-recreate ${serviceNameFor(name)}`, logs);
     }
   }
 
   // 5) 等待模块健康
   const ok = await waitHealth((target as any).healthCheck);
-  if (!ok) return { success: false, message: `模块未就绪: ${name}` };
+  if (!ok) return { success: false, message: `模块未就绪: ${name}` , data: { logs } };
 
-  return { success: true, message: `start ${name} OK` };
+  return { success: true, message: `start ${name} OK`, data: { logs } };
 }
 
 export async function stopModule(name: ModuleName): Promise<IpcResponse> {
+  const logs: LogEntry[] = [];
   const compose = await pickComposeCommand();
   if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
   const reg = loadRegistry();
@@ -193,18 +238,18 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
 
   if (target.type === 'feature') {
     const featureCompose = path.join(process.cwd(), 'orchestration', 'modules', name, 'docker-compose.feature.yml');
-    await run(`${compose} -f ${featureCompose} stop ${serviceNameFor(name)}`);
+    await execAndLog(`${compose} -f ${featureCompose} stop ${serviceNameFor(name)}`, logs);
   } else {
     // basic 模块：直接 stop，但不自动 down，避免误删共享资源
     const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
-    await run(`${compose} -f ${infraCompose} stop ${serviceNameFor(name)}`);
+    await execAndLog(`${compose} -f ${infraCompose} stop ${serviceNameFor(name)}`, logs);
   }
   // 兜底：若容器仍在运行，直接 docker stop 容器名
   try {
     const cname = containerNameFor(name);
     const set = await listRunningContainerNames();
     if (set.has(cname)) {
-      await run(`docker stop ${cname}`);
+      await execAndLog(`docker stop ${cname}`, logs);
     }
   } catch {}
   // 依赖感知回收：若目标是 feature，则尝试回收其依赖中未被其它运行模块占用的 basic
@@ -218,13 +263,13 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
         // 判断用户模块是否有运行中的容器（简单以服务名或容器名包含模块名匹配）
         const inUse = users.some(u => Array.from(runningNames).some(n => n.includes(serviceNameFor(u.name))));
         if (!inUse) {
-          await run(`${compose} -f ${infraCompose} stop ${serviceNameFor(dep)}`);
+          await execAndLog(`${compose} -f ${infraCompose} stop ${serviceNameFor(dep)}`, logs);
         }
       }
     }
   } catch {}
 
-  return { success: true, message: `stop ${name} OK` };
+  return { success: true, message: `stop ${name} OK`, data: { logs } };
 }
 
 export async function clearModuleCache(name: ModuleName): Promise<IpcResponse> {
@@ -342,4 +387,132 @@ async function listAllContainerNames(): Promise<Set<string>> {
   } catch {
     return new Set();
   }
+}
+
+// ===== 实时日志流版本 =====
+export async function startModuleStream(name: ModuleName, sender: WebContents, streamId: string): Promise<IpcResponse> {
+  // 确保外部网络与命名卷存在（幂等）
+  await ensureExternalInfraResources();
+  const compose = await pickComposeCommand();
+  if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
+  const reg = loadRegistry();
+  const modules = reg.modules || [];
+  const target = modules.find(m => m.name === name);
+  if (!target) return { success: false, message: `模块未注册: ${name}` };
+
+  const deps = (target.dependsOn || []) as ModuleName[];
+
+  // 端口占用校验
+  const checkList = [...deps, name];
+  const runningNames = await listRunningContainerNames();
+  for (const modName of checkList) {
+    const item = modules.find(m => m.name === modName);
+    if (!item) continue;
+    const cname = containerNameFor(modName);
+    if (runningNames.has(cname) && modName !== name) continue;
+    const ports = (item as any).ports as Array<{ container: number; host: string; bind?: string }> | undefined;
+    if (!ports || ports.length === 0) continue;
+    for (const p of ports) {
+      const bind = resolveDefaultVar(p.bind ?? '${BIND_ADDRESS:127.0.0.1}', '127.0.0.1') ?? '127.0.0.1';
+      const hostPortStr = resolveDefaultVar(String(p.host ?? ''), undefined);
+      const hostPort = hostPortStr ? Number(hostPortStr) : undefined;
+      if (!hostPort) continue;
+      const occupied = await isTcpOpen(bind, hostPort, 800);
+      if (occupied) {
+        return { success: false, message: `端口已被占用: ${bind}:${hostPort}（模块: ${modName}）。请在设置中修改宿主机端口或释放后重试。` };
+      }
+    }
+  }
+
+  // 启动依赖
+  if (deps.length > 0) {
+    const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
+    const runningSet = await listRunningContainerNames();
+    const allSet = await listAllContainerNames();
+    const needUp: string[] = [];
+    for (const dep of deps) {
+      const cname = containerNameFor(dep);
+      if (runningSet.has(cname)) continue;
+      if (allSet.has(cname)) {
+        await spawnStream(`docker start ${cname}`, sender, streamId);
+      } else {
+        needUp.push(serviceNameFor(dep));
+      }
+    }
+    if (needUp.length > 0) {
+      await spawnStream(`${compose} -f ${infraCompose} up -d --no-recreate ${needUp.join(' ')}`, sender, streamId);
+    }
+    for (const dep of deps) {
+      const depItem = modules.find(m => m.name === dep);
+      if (!depItem) continue;
+      const hc = (depItem as any).healthCheck;
+      const ok = await waitHealth(hc);
+      if (!ok) return { success: false, message: `依赖未就绪: ${dep}` };
+    }
+  }
+
+  // 启动自身
+  if (target.type === 'feature') {
+    const featureCompose = path.join(process.cwd(), 'orchestration', 'modules', name, 'docker-compose.feature.yml');
+    const cname = containerNameFor(name);
+    const runningSet = await listRunningContainerNames();
+    const allSet = await listAllContainerNames();
+    if (runningSet.has(cname)) {
+      // 已在运行
+    } else if (allSet.has(cname)) {
+      await spawnStream(`docker start ${cname}`, sender, streamId);
+    } else {
+      await spawnStream(`${compose} -f ${featureCompose} up -d --no-recreate ${serviceNameFor(name)}`, sender, streamId);
+    }
+  } else {
+    const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
+    const cname = containerNameFor(name);
+    const runningSet = await listRunningContainerNames();
+    const allSet = await listAllContainerNames();
+    if (runningSet.has(cname)) {
+      // 已在运行
+    } else if (allSet.has(cname)) {
+      await spawnStream(`docker start ${cname}`, sender, streamId);
+    } else {
+      await spawnStream(`${compose} -f ${infraCompose} up -d --no-recreate ${serviceNameFor(name)}`, sender, streamId);
+    }
+  }
+  const ok = await waitHealth((target as any).healthCheck);
+  if (!ok) return { success: false, message: `模块未就绪: ${name}` };
+  return { success: true, message: `start ${name} OK` };
+}
+
+export async function stopModuleStream(name: ModuleName, sender: WebContents, streamId: string): Promise<IpcResponse> {
+  const compose = await pickComposeCommand();
+  if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
+  const reg = loadRegistry();
+  const modules = reg.modules || [];
+  const target = modules.find(m => m.name === name);
+  if (!target) return { success: false, message: `模块未注册: ${name}` };
+  if (target.type === 'feature') {
+    const featureCompose = path.join(process.cwd(), 'orchestration', 'modules', name, 'docker-compose.feature.yml');
+    await spawnStream(`${compose} -f ${featureCompose} stop ${serviceNameFor(name)}`, sender, streamId);
+  } else {
+    const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
+    await spawnStream(`${compose} -f ${infraCompose} stop ${serviceNameFor(name)}`, sender, streamId);
+  }
+  try {
+    const cname = containerNameFor(name);
+    const set = await listRunningContainerNames();
+    if (set.has(cname)) await spawnStream(`docker stop ${cname}`, sender, streamId);
+  } catch {}
+  return { success: true, message: `stop ${name} OK` };
+}
+
+export async function firstStartModuleStream(name: ModuleName, sender: WebContents, streamId: string): Promise<IpcResponse> {
+  const running = await dockerRunning();
+  const compose = await pickComposeCommand();
+  if (!running) return { success: false, message: 'Docker 未运行' };
+  if (!compose) return { success: false, message: '未检测到 docker compose/docker-compose' };
+  try {
+    await ensureExternalResources();
+  } catch (e: any) {
+    return { success: false, message: `初始化外部资源失败: ${String(e?.message ?? e)}` };
+  }
+  return startModuleStream(name, sender, streamId);
 }
