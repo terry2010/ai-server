@@ -1,0 +1,12 @@
+{
+  "name": "redis",
+  "type": "basic",
+  "dependsOn": [],
+  "image": "redis:7.2-alpine",
+  "ports": [
+    { "container": 6379, "host": "${REDIS_PORT:16379}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+  ],
+  "variables": {},
+  "healthCheck": { "type": "tcp", "target": "localhost:${REDIS_PORT:16379}", "interval": 2000, "timeout": 15000, "retries": 20 },
+  "compose": { "templateRef": "redis" }
+}

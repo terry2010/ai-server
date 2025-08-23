@@ -1,0 +1,18 @@
+{
+  "name": "oneapi",
+  "type": "feature",
+  "dependsOn": ["mysql", "redis"],
+  "image": "justsong/one-api:v0.6.11-preview.7",
+  "ports": [
+    { "container": 3000, "host": "${ONEAPI_PORT:18080}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+  ],
+  "variables": {
+    "ONEAPI_DB_USER": "${ONEAPI_DB_USER:root}",
+    "ONEAPI_DB_PASS": "${ONEAPI_DB_PASS:root}",
+    "ONEAPI_DB_HOST": "${ONEAPI_DB_HOST:127.0.0.1}",
+    "ONEAPI_DB_PORT": "${ONEAPI_DB_PORT:13306}",
+    "ONEAPI_DB_NAME": "${ONEAPI_DB_NAME:oneapi}"
+  },
+  "healthCheck": { "type": "http", "target": "http://localhost:${ONEAPI_PORT:18080}/", "interval": 2000, "timeout": 20000, "retries": 30 },
+  "compose": { "templateRef": "oneapi" }
+}

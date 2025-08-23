@@ -4,8 +4,8 @@ AI-Server 基于现有代码的增量开发 Prompt（Win10）
 
 仓库路径（本地）：`c:/code/ai-server`
 权威文档：
-- `doc/AI-Server-编排设计与实施方案.md`
-- `doc/Electron-单窗口原型-代码结构与接口骨架.md`
+- `C:\code\ai-server\doc\AI-Server-编排设计与实施方案.md`
+- `C:\code\ai-server\doc\AI-Server-编排设计与实施方案.md`
 
 ---
 

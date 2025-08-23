@@ -1,14 +1,18 @@
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc-contract';
-
-const memStore = new Map<string, any>();
+import { getGlobalConfig, setGlobalConfig, getFirstRunState, patchFirstRunState } from '../config/store';
 
 ipcMain.handle(IPC.ConfigGet, async (_e, key?: string) => {
-  if (!key) return { success: true, data: Object.fromEntries(memStore.entries()) };
-  return { success: true, data: memStore.get(key) };
+  if (!key) {
+    return { success: true, data: { global: getGlobalConfig(), firstRun: getFirstRunState() } };
+  }
+  if (key === 'global') return { success: true, data: getGlobalConfig() };
+  if (key === 'firstRun') return { success: true, data: getFirstRunState() };
+  return { success: false, message: 'unknown key' };
 });
 
-ipcMain.handle(IPC.ConfigSet, async (_e, payload: Record<string, any>) => {
-  Object.entries(payload || {}).forEach(([k, v]) => memStore.set(k, v));
-  return { success: true, data: payload };
+ipcMain.handle(IPC.ConfigSet, async (_e, payload: { global?: Record<string, any>; firstRun?: Record<string, any> }) => {
+  if (payload?.global) setGlobalConfig(payload.global as any);
+  if (payload?.firstRun) patchFirstRunState(payload.firstRun as any);
+  return { success: true, data: { global: getGlobalConfig(), firstRun: getFirstRunState() } };
 });
