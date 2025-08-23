@@ -58,6 +58,21 @@
   - 再启动 Dify：`./scripts/module.ps1 -Name dify -Action start -ApiPort 18091`
   - 已启用 `MIGRATION_ENABLED=true`，容器启动时自动执行 Alembic 迁移（等价 `flask db upgrade`）。对已有数据执行增量迁移，正常不丢数据；生产建议先做数据库快照。
 
+#### 7.4.1 UI 启动流与 CORS 配置变更（关键）
+
+- UI 启动链路：`Start(dify)` 会先确保 `postgres`、`redis` 运行并 healthy，然后一次性拉起 `dify-api` 与 `dify-web`（通过解析 feature compose 的 `services` 键实现，不再依赖硬编码）。
+- 端口与绑定：
+  - Web: `http://{BIND_ADDRESS}:${DIFY_WEB_PORT}`（默认 `127.0.0.1:18090`）
+  - API: `http://{BIND_ADDRESS}:${DIFY_API_PORT}`（默认 `127.0.0.1:18091`）
+- CORS：
+  - `dify-api` 环境变量新增并启用 `CORS_ALLOW_ORIGINS="http://127.0.0.1:${DIFY_WEB_PORT:-18090}"`，允许前端从 Web 端口访问 API。
+  - 为兼容/冗余，保留 `WEB_API_CORS_ALLOW_ORIGINS="*"`、`CONSOLE_CORS_ALLOW_ORIGINS="*"`（若上游镜像忽略则不生效）。
+  - `dify-web` 指向宿主 API：`CONSOLE_API_URL` 与 `NEXT_PUBLIC_CONSOLE_API_URL` 统一为 `http://127.0.0.1:${DIFY_API_PORT:-18091}`；内部调用使用 `DIFY_API_URL=http://ai-dify-api:5001`。
+
+实现要点：
+- 服务映射通用化：`src/main/docker/naming.ts` 的 `servicesForModule(name)` 通过读取“物化后的 feature compose”（`materializeFeatureCompose` 输出）动态解析 `services` 列表，取代先前针对 `dify` 的特判；如解析失败则回退为 `[name]`。
+- 注册表变量清理：`src/main/config/registry/dify.json` 统一为 Postgres + Redis 方案，移除 MySQL 风格键，仅保留 `DIFY_WEB_PORT`、`DIFY_API_PORT`、`BIND_ADDRESS` 等与端口/绑定相关的变量，避免混淆。
+
 ## 1. 目标与原则
 
 - 以模块为粒度进行持续集成：Dify、RagFlow、n8n、OneAPI 等。

@@ -189,11 +189,17 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
   if (!target) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
 
   if (target.type === 'feature') {
-    const tpl = getFeatureComposePath(name);
-    if (!tpl.ok) return { success: false, code: tpl.code, message: tpl.message, data: { logs } };
-    const featureCompose = tpl.path;
-    const r = await composeStop(featureCompose, servicesForModule(name));
-    if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败', data: { logs } };
+    const tpl = materializeFeatureCompose(name);
+    if (!tpl.ok) return { success: false, code: (tpl as any).code, message: (tpl as any).message, data: { logs } };
+    const featureCompose = (tpl as any).path;
+    const svc = servicesForModule(name);
+    const r = await composeStop(featureCompose, svc);
+    if (!r.ok) {
+      // 兜底：直接 docker stop 每个容器
+      for (const s of svc) {
+        try { await execAndLog(`docker stop ${containerNameFor(s)}`, logs); } catch {}
+      }
+    }
   } else {
     // basic 模块：在停止前进行占用检查——若仍被运行中的 feature 依赖，阻止
     const reg2 = loadRegistry();
@@ -201,7 +207,10 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
     const users = modules2.filter(m => m.type === 'feature' && (m.dependsOn || []).includes(name));
     if (users.length > 0) {
       const runningSet = await listRunningContainerNames();
-      const inUse = users.some(u => runningSet.has(containerNameFor(u.name)));
+      const inUse = users.some(u => {
+        const svcs = servicesForModule(u.name as ModuleName);
+        return svcs.some(s => runningSet.has(containerNameFor(s)));
+      });
       if (inUse) {
         logs.push({ cmd: `[dep] block stop basic ${name}: in use by ${users.map(u=>u.name).join(', ')}` });
         return { success: false, code: 'E_IN_USE', message: `基础服务 ${name} 仍被运行中的功能模块依赖，已阻止停止。` };
@@ -232,8 +241,11 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
         const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
         for (const dep of deps) {
           const users = modules.filter(m => m.name !== name && m.type === 'feature' && (m.dependsOn || []).includes(dep));
-          // 精确判断：是否存在运行中的依赖者（按容器名精确匹配）
-          const inUse = users.some(u => runningNames.has(containerNameFor(u.name)));
+          // 精确判断：是否存在运行中的依赖者（任一服务容器在运行即视为占用）
+          const inUse = users.some(u => {
+            const svcs = servicesForModule(u.name as ModuleName);
+            return svcs.some(s => runningNames.has(containerNameFor(s)));
+          });
           if (!inUse) {
             logs.push({ cmd: `[dep] auto-stop unused basic ${dep}` });
             await execAndLog(`${compose} -f ${infraCompose} stop ${serviceNameFor(dep)}`, logs);
@@ -256,41 +268,59 @@ export async function clearModuleCache(name: ModuleName): Promise<IpcResponse> {
 }
 
 export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<ModuleStatus>> {
-  // 仅返回该模块对应容器的状态与端口
+  // 返回模块（可能由多个服务组成）的聚合状态与端口
   try {
-    const cname = containerNameFor(name);
-    const { stdout } = await run('docker ps --format "{{.Names}}|{{.Ports}}"');
-    const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
-    const match = lines.find(l => l.startsWith(cname + '|'));
-    // 端口（仅当容器在运行集中时才有）
-    let n = cname; let portStr = '';
-    if (match) {
-      const parts = match.split('|'); n = parts[0]; portStr = parts[1] || '';
-    }
-    // 精确状态
-    let state = 'stopped';
-    try {
-      const { stdout: s2 } = await run(`docker inspect -f "{{.State.Status}}" ${cname}`);
-      state = s2.trim() || 'stopped';
-    } catch {}
-    const running = state.toLowerCase() === 'running';
-    const ports: Record<string, string> = {};
-    if (portStr) ports[n] = portStr;
-    let status: ModuleStatus['status'] = 'stopped';
-    if (state === 'running') status = 'running';
-    else if (state === 'restarting') status = 'error';
-    else if (state === 'exited' || state === 'dead') status = 'error';
-    // usedBy 计算（仅当该模块为基础服务时才有意义）
     const reg = loadRegistry();
     const mods = reg.modules || [];
     const self = mods.find(m => m.name === name);
+    if (!self) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
+
+    // 收集需要检查的容器名
+    const services = self.type === 'feature' ? servicesForModule(name) : [name];
+    const containers = services.map(s => containerNameFor(s));
+
+    // docker ps 列表用于端口映射收集
+    const { stdout } = await run('docker ps --format "{{.Names}}|{{.Ports}}"');
+    const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+    const ports: Record<string, string> = {};
+    const states: string[] = [];
+
+    for (const cname of containers) {
+      // 端口（仅当容器在运行集中时才有）
+      const match = lines.find(l => l.startsWith(cname + '|'));
+      if (match) {
+        const parts = match.split('|');
+        const portStr = parts[1] || '';
+        if (portStr) ports[cname] = portStr;
+      }
+      // 精确状态
+      let state = 'stopped';
+      try {
+        const { stdout: s2 } = await run(`docker inspect -f "{{.State.Status}}" ${cname}`);
+        state = (s2.trim() || 'stopped').toLowerCase();
+      } catch {}
+      states.push(state);
+    }
+
+    // 计算聚合状态
+    let status: ModuleStatus['status'] = 'stopped';
+    if (states.length > 0 && states.every(s => s === 'running')) status = 'running';
+    else if (states.some(s => s === 'restarting' || s === 'exited' || s === 'dead')) status = 'error';
+    else status = 'stopped';
+    const running = status === 'running';
+
+    // usedBy 计算（仅当该模块为基础服务时才有意义）
     let usedBy: string[] | undefined = undefined;
     if (self && self.type === 'basic') {
       const runningSet = await listRunningContainerNames();
       const users = mods.filter(m => m.type === 'feature' && (m.dependsOn || []).includes(name));
-      const activeUsers = users.filter(u => runningSet.has(containerNameFor(u.name))).map(u => u.name);
+      const activeUsers = users.filter(u => {
+        const svcs = servicesForModule(u.name as ModuleName);
+        return svcs.some(s => runningSet.has(containerNameFor(s)));
+      }).map(u => u.name);
       usedBy = activeUsers;
     }
+
     return { success: true, data: { running, status, ports, usedBy } };
   } catch (e: any) {
     return { success: false, code: 'E_RUNTIME', message: String(e?.message ?? e) };
@@ -418,11 +448,18 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
   const target = modules.find(m => m.name === name);
   if (!target) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
   if (target.type === 'feature') {
-    const tpl = getFeatureComposePath(name);
-    if (!tpl.ok) return { success: false, code: tpl.code, message: tpl.message };
-    const featureCompose = tpl.path;
-    const r = await composeStopStream(featureCompose, servicesForModule(name), sender, streamId);
-    if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败' };
+    const tpl = materializeFeatureCompose(name);
+    if (!tpl.ok) return { success: false, code: (tpl as any).code, message: (tpl as any).message };
+    const featureCompose = (tpl as any).path;
+    const svc = servicesForModule(name);
+    const r = await composeStopStream(featureCompose, svc, sender, streamId);
+    if (!r.ok) {
+      // 兜底：直接 docker stop
+      for (const s of svc) {
+        try { await spawnStream(`docker stop ${containerNameFor(s)}`, sender, streamId); } catch {}
+      }
+      // 不返回错误，让上层依据容器状态刷新
+    }
   } else {
     // basic 模块：在停止前进行占用检查——若仍被运行中的 feature 依赖，阻止
     const users = modules.filter(m => m.type === 'feature' && (m.dependsOn || []).includes(name));

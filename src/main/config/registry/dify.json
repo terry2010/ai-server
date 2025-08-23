@@ -7,14 +7,9 @@
     { "container": 5001, "host": "${DIFY_API_PORT:18091}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
   ],
   "variables": {
-    "DIFY_DB_HOST": "${DIFY_DB_HOST:127.0.0.1}",
-    "DIFY_DB_PORT": "${DIFY_DB_PORT:13306}",
-    "DIFY_DB_USER": "${DIFY_DB_USER:root}",
-    "DIFY_DB_PASS": "${DIFY_DB_PASS:root}",
-    "DIFY_DB_NAME": "${DIFY_DB_NAME:dify}",
-    "DIFY_REDIS_HOST": "${DIFY_REDIS_HOST:127.0.0.1}",
-    "DIFY_REDIS_PORT": "${DIFY_REDIS_PORT:16379}",
-    "DIFY_API_PORT": "${DIFY_API_PORT:18091}"
+    "DIFY_WEB_PORT": "${DIFY_WEB_PORT:18090}",
+    "DIFY_API_PORT": "${DIFY_API_PORT:18091}",
+    "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}"
   },
   "healthCheck": { "type": "http", "target": "http://localhost:${DIFY_WEB_PORT:18090}/", "interval": 2000, "timeout": 20000, "retries": 30 },
   "compose": { "templateRef": "docker-compose.feature.yml" }
