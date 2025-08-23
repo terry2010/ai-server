@@ -47,7 +47,10 @@ app.whenReady().then(() => {
     const electronModule = require('electron');
     console.log('[main] typeof require("electron") =', typeof electronModule);
     console.log('[main] has ipcMain =', !!electronModule.ipcMain);
-    require('./ipc/bootstrap');
+    require('./ipc/env');
+    require('./ipc/docker');
+    require('./ipc/modules');
+    require('./ipc/config');
   } catch (e) {
     console.error('[main] failed to load ipc handlers:', e);
   }

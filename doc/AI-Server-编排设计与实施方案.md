@@ -68,6 +68,13 @@ orchestration/
 
 旧文件保持不变：`docker-compose/*.template.yml`、`doc/system-code/`。
 
+配置注册表位置（新建）：
+
+- 内置注册表（随代码发布）：`src/main/config/registry/*.json`
+- 用户覆盖注册表：`%APPDATA%/ai-server/modules/*.json`（Electron：`app.getPath('userData')/modules/`）
+- 合并顺序：内置 → 用户覆盖 → 运行时矫正（端口冲突自动建议等）
+- 热加载（可选）：监听 `userData/modules/` 文件变更，运行时刷新模块清单
+
 ---
 
 ## 3. 网络、卷与端口策略
@@ -140,6 +147,24 @@ orchestration/
 - 运行态识别：
   - 通过 Docker CLI/SDK 依据 labels 过滤容器，实现“无状态实时判断法”（无需持久化引用计数）。
 
+### 5.3 可配置的模块注册与依赖图
+
+- 模块以“声明式”方式注册，主进程在运行时加载注册表生成依赖图：
+  - 注册来源：内置 `src/main/config/registry/*.json` + 用户覆盖 `userData/modules/*.json`
+  - 字段见“6.1 模块 Schema 定义”
+  - 拓扑排序：依据 `dependsOn` 生成启动/停止序列，循环依赖直接报错并指引
+  - Profiles：通过 `profiles` 开关实现互斥/可选依赖（如 OpenSearch/Elasticsearch 二选一）
+- 启动时序（可配置策略）：
+  - `autoStartDeps`（默认 true）：启动功能模块前先确保依赖基础服务已运行并 healthy
+  - `healthCheck`（模块内定义）：支持 `tcp`/`http`/`container_healthy`，带重试/超时
+  - 端口占用：启动前校验宿主端口，冲突时可按策略 `autoSuggestNextPort`
+- 模板渲染：
+  - 每个模块可声明 `compose.templateRef` 或内联 `compose.fragment`
+  - 渲染变量来源：模块 `variables` + 全局配置（第6章）
+  - 组合策略：将所需基础服务与模块片段合并为一次 `docker compose up -d`，或按服务分步 `up`（实现可选）
+  - Windows 路径做正斜杠化与转义处理
+  - 错误码：模板缺失、变量缺失、循环依赖、端口冲突、健康超时
+
 ### 5.1 UI 按钮语义（严格依赖处理）
 
 - 启动（Start）：
@@ -174,6 +199,38 @@ orchestration/
 - UI 形态：
   - 简易模式：暴露常用项（宿主端口、密码、是否使用外部DB/Redis）。
   - 高级模式：可编辑全部键值。
+
+### 6.1 模块 Schema 定义（关键字段）
+
+示例（JSON 结构，非最终约束）：
+
+```json
+{
+  "name": "mysql",
+  "type": "basic",
+  "dependsOn": [],
+  "profiles": ["default"],
+  "image": "mysql:8.0.39",
+  "env": { "MYSQL_ROOT_PASSWORD": "${MYSQL_ROOT_PASSWORD:root}" },
+  "ports": [{ "container": 3306, "host": "${MYSQL_PORT:13306}", "bind": "${BIND_ADDRESS:127.0.0.1}" }],
+  "volumes": [{ "host": "${DATA_DIR}/mysql", "container": "/var/lib/mysql" }],
+  "variables": { "DATA_DIR": "${USER_DATA}/data" },
+  "healthCheck": { "type": "tcp", "target": "localhost:${MYSQL_PORT:13306}", "interval": 2000, "timeout": 15000, "retries": 20 },
+  "compose": { "templateRef": "mysql" },
+  "lifecycle": { "preUp": [], "postUp": [], "preDown": [] }
+}
+```
+
+字段说明：
+
+- `name`、`type`：模块标识与角色（`basic|feature`）
+- `dependsOn`：依赖模块名数组；支持通过 `profiles` 互斥选择
+- `profiles`：场景开关（如 `opensearch` | `elasticsearch`）
+- `image/env/volumes/ports`：容器要素（容器内端口固定；仅宿主映射端口可配）
+- `variables`：模板变量，允许默认值 `${VAR:default}`，最终与全局配置合并
+- `healthCheck`：`tcp`/`http`/`container_healthy`，包含 `interval/timeout/retries`
+- `compose`：引用命名模板 `templateRef` 或提供 `fragment`
+- `lifecycle`：预留钩子，执行简单命令或校验（不建议复杂脚本）
 
 ---
 

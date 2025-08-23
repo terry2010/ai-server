@@ -38,6 +38,7 @@ ai-server/
       config/
         store.ts               # 配置持久化（userData）
         schema.ts              # 类型/默认值
+        registry/              # 内置模块注册表（JSON），可被用户覆盖
     renderer/                  # 渲染进程（Vite + Vue + TS）
       main.ts                  # Vue 入口
       app.vue
@@ -64,6 +65,13 @@ ai-server/
 约束：
 - 严禁“上帝文件”，单文件 ≤ 400 行；必要时继续拆分到按域模块目录。
 - `shared/` 仅放 TS 类型与常量，避免引入 Node/DOM 环境特定依赖。
+
+注册表位置与合并（与《实施方案》一致）：
+
+- 内置注册表：`src/main/config/registry/*.json`
+- 用户覆盖注册表：`app.getPath('userData')/modules/*.json`
+- 合并顺序：内置 → 用户覆盖 → 运行时矫正（端口冲突自动建议等）
+- 可选热加载：监听 `userData/modules/` 文件变更以刷新模块清单
 
 ---
 
@@ -112,6 +120,18 @@ export const IPC = {
 } as const;
 ```
 
+### 3.1 错误码与数据契约细化
+
+- IpcResponse 错误码（`message` 需可读，开发态在 console 追加 stack）：
+  - `E_COMPOSE_NOT_FOUND`：未检测到 docker compose 命令
+  - `E_TEMPLATE_MISSING`：模块缺少模板或模板引用不存在
+  - `E_VAR_MISSING`：必需变量缺失（含端口/密码等）
+  - `E_PORT_CONFLICT`：宿主端口冲突
+  - `E_DEP_CYCLE`：循环依赖
+  - `E_HEALTH_TIMEOUT`：健康检查超时
+  - `E_RUNTIME`：其他运行时错误
+- ModuleStatus 补充：`errorCode?: string; errorDetail?: string`
+
 ---
 
 ## 4. 主进程骨架
@@ -131,6 +151,18 @@ export const IPC = {
   - 组合命令适配：优先 `docker compose`，回退 `docker-compose`
   - 启停算法遵循《实施方案》第 5 章与《实现规范》6.1
   - 端口占用检测、健康检查等待、依赖计算
+
+### 4.1 注册表加载与合并（实现细则）
+
+- 入口：`src/main/docker/index.ts` 在首次调用前懒加载注册表；或在 `app.whenReady()` 时由 `src/main/config/store.ts` 预加载缓存。
+- 步骤：
+  1) 读取内置 `src/main/config/registry/*.json`
+  2) 合并用户覆盖 `userData/modules/*.json`
+  3) 使用 `schema.ts`（Zod/自定义校验）做 schema 校验与默认值填充
+  4) 生成依赖图（拓扑排序），预检测循环依赖并缓存
+  5) 生成渲染所需列表：`{ basic: ModuleItem[]; feature: ModuleItem[] }`
+- 运行态：每次 `ModuleStatus` 走 Docker CLI 过滤 labels 即时计算，不存持久化状态
+- 模板渲染：`docker/template.ts` 负责 `templateRef`/`fragment` 合成，变量来自“模块 variables + 全局配置 store”
 
 示例：`src/main/ipc/modules.ts`
 
@@ -172,6 +204,8 @@ ipcMain.handle(IPC.ModuleClear, async (_e, payload: { name: ModuleName }) => {
     - 端口映射预览
     - 操作按钮：启动、停止、清理缓存、设置端口（弹窗表单）
 
+动态清单：`ModulesList` 由 IPC 动态返回，前端不硬编码模块。提交设置后调用 `ConfigSet` 并刷新清单。
+
 界面布局（示意）：
 
 ```text
@@ -212,6 +246,11 @@ export const useModuleStore = defineStore('modules', {
   - 功能模块：先停自身，再判断依赖基础服务是否仍被其他功能模块使用，默认不自动回收，可提供“智能回收”选项
 - 清理缓存：清除 compose 缓存文件与容器（谨慎操作确认）
 - 端口设置：提交前做占用检测
+
+补充实现细则：
+
+- 端口校验：`a-form` 自定义异步校验器，调用 IPC `ai/module/validatePorts`（或在 `ModuleStart` 前统一校验）
+- 健康等待：启动后轮询 `ModuleStatus` 或由主进程返回 `progress`（可后续扩展事件通道），当前版本以主进程阻塞等待后再返回成功
 
 ---
 

@@ -2,15 +2,9 @@
   <div style="padding:16px">
     <a-page-header title="AI-Server 开发原型" sub-title="单窗口 / 环境诊断 与 模块管理" />
 
-    <a-card style="margin-top:12px" title="环境诊断">
-      <a-space>
-        <a-button type="primary" @click="onDiagnose" :loading="loading">运行检测</a-button>
-        <a-tag v-if="env?.docker?.installed" color="green">Docker: 已安装</a-tag>
-        <a-tag v-else color="red">Docker: 未安装</a-tag>
-        <a-tag v-if="env?.docker?.running" color="green">Docker: 运行中</a-tag>
-        <a-tag v-else color="red">Docker: 未运行</a-tag>
-      </a-space>
-    </a-card>
+    <div style="margin-top:12px">
+      <env-card />
+    </div>
 
     <a-tabs style="margin-top:12px">
       <a-tab-pane key="basic" tab="基础服务模块">
@@ -26,22 +20,10 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
 import ModuleList from '@/renderer/components/ModuleList.vue';
+import EnvCard from '@/renderer/components/EnvCard.vue';
 
-interface Env {
-  docker: { installed: boolean; running: boolean };
-}
-
-const loading = ref(false);
-const env = ref<Env | null>(null);
 const basicModules = ref<any[]>([]);
 const featureModules = ref<any[]>([]);
-
-const onDiagnose = async () => {
-  loading.value = true;
-  const res = await (window as any).api.invoke('ai/env/diagnose');
-  env.value = res?.data || null;
-  loading.value = false;
-};
 
 const loadModules = async () => {
   const res = await (window as any).api.invoke('ai/modules/list');
