@@ -21,6 +21,13 @@ async function execAndLog(cmd: string, logs: LogEntry[], cwd?: string) {
   return r;
 }
 
+// 向渲染进程发送一条标准输出日志（避免把纯文本当作命令执行）
+function emitStdout(sender: WebContents, streamId: string, text: string) {
+  try {
+    sender.send(IPC.ModuleLogEvent, { streamId, event: 'stdout', chunk: text });
+  } catch {}
+}
+
 // 实时日志流由 ./log-stream 提供
 
 export interface ModuleItem { name: string; type: ModuleType }
@@ -444,7 +451,7 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
       const runningSet = await listRunningContainerNames();
       const inUse = users.some(u => runningSet.has(containerNameFor(u.name)));
       if (inUse) {
-        await spawnStream(`[dep] block stop basic ${name}: in use by ${users.map(u=>u.name).join(', ')}`, sender, streamId);
+        emitStdout(sender, streamId, `[dep] block stop basic ${name}: in use by ${users.map(u=>u.name).join(', ')}`);
         return { success: false, code: 'E_IN_USE', message: `基础服务 ${name} 仍被运行中的功能模块依赖，已阻止停止。` };
       }
     }
@@ -470,11 +477,10 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
             const users = modules.filter(m => m.name !== name && m.type === 'feature' && (m.dependsOn || []).includes(dep));
             const inUse = users.some(u => runningNames.has(containerNameFor(u.name)));
             if (!inUse) {
-              await spawnStream(`[dep] auto-stop unused basic ${dep}`, sender, streamId);
+              emitStdout(sender, streamId, `[dep] auto-stop unused basic ${dep}`);
               await composeStopStream(infraCompose, [serviceNameFor(dep)], sender, streamId);
-            }
-            else {
-              await spawnStream(`[dep] keep basic ${dep}: in use by ${users.map(u=>u.name).join(', ')}`, sender, streamId);
+            } else {
+              emitStdout(sender, streamId, `[dep] keep basic ${dep}: in use by ${users.map(u=>u.name).join(', ')}`);
             }
           }
         }

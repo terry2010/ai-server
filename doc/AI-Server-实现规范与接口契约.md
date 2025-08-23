@@ -65,6 +65,40 @@
 }
 ```
 
+### 5.5 模板渲染错误与返回示例
+
+- __E_TEMPLATE_MISSING__：找不到 feature 的模板文件或引用的 fragment。
+  - 触发点：`getFeatureComposePath()` / `materializeFeatureCompose()`。
+  - 返回示例：
+    ```json
+    {
+      "success": false,
+      "code": "E_TEMPLATE_MISSING",
+      "message": "未找到 dify 的 compose 模板文件"
+    }
+    ```
+
+- __E_VAR_MISSING__：出现 `${VAR}` 未提供值且无默认值。
+  - 触发点：`materializeFeatureCompose()` 在变量替换阶段收集缺失项。
+  - 返回示例：
+    ```json
+    {
+      "success": false,
+      "code": "E_VAR_MISSING",
+      "message": "缺失变量: DATA_DIR, DIFY_API_PORT"
+    }
+    ```
+
+- __E_RUNTIME__：YAML 解析/合并或文件写入异常等兜底错误。
+  - 返回示例：
+    ```json
+    {
+      "success": false,
+      "code": "E_RUNTIME",
+      "message": "YAML 解析失败: bad indentation of a mapping entry"
+    }
+    ```
+
 ### 3.2 各模块默认值与约束
 - Dify：
   - 固定：插件守护与插件相关密钥/端口写死；Web 默认路由 `/apps` 固定。
@@ -214,17 +248,20 @@ function generateComposeFromTemplate(module, mergedConfig) {
 
 ## 7. 日志与错误处理
 - 主进程将 `spawn` 的 `stdout/stderr` 追加到模块级 ring buffer（如 2000 行），UI 可拉取最近日志。
-- 标准错误码与提示：
-  - `E_DOCKER_NOT_INSTALLED`：提示“未安装 Docker，请安装后重试”。
-  - `E_DOCKER_NOT_RUNNING`：提示“一键启动 Docker Desktop 或手动启动”。
-  - `E_COMPOSE_NOT_FOUND`：提示“未检测到 docker compose 或 docker-compose”。
-  - `E_TEMPLATE_MISSING`：模块模板或引用片段缺失。
-  - `E_TEMPLATE_GEN_FAILED`：模板生成失败（兜底）。
+- 标准错误码（实现对齐 `src/shared/ipc-contract.ts`）：
+  - `E_COMPOSE_NOT_FOUND`：未检测到 docker compose/docker-compose。
+  - `E_TEMPLATE_MISSING`：模板或 fragment 缺失。
   - `E_VAR_MISSING`：存在 `${VAR}` 未提供值且无默认；`message` 包含缺失变量列表。
-  - `E_COMPOSE_UP_FAILED` / `E_COMPOSE_DOWN_FAILED`。
+  - `E_DEP_CYCLE`：依赖图存在环；`message` 含环路径。
+  - `E_PORT_CONFLICT`：宿主机端口冲突；`message` 含 `bind:hostPort` 与模块名。
+  - `E_HEALTH_TIMEOUT`：依赖/模块健康检查超时。
+  - `E_PREFLIGHT_RESOURCE`：首次启动的外部资源准备失败（网络/卷创建）。
+  - `E_IN_USE`：基础服务被运行中的功能模块占用，阻止停止。
+  - `E_RUNTIME`：其他运行时错误（包含 compose 执行/容器操作异常兜底）。
 
 UI 建议：
-- 在 `src/renderer/pages/Home.vue` 中对 `E_TEMPLATE_MISSING`、`E_VAR_MISSING`、`E_RUNTIME` 用 Modal 详细展示错误与命令输出，并提供“一键复制详情”。
+- 在 `src/renderer/pages/Home.vue` 中对 `E_TEMPLATE_MISSING`、`E_VAR_MISSING`、`E_RUNTIME`、`E_IN_USE` 用 Modal 详细展示错误与命令输出，并提供“一键复制详情”。
+- LogsPanel：展示流式（`IPC.ModuleLogEvent`）与一次性返回的 `data.logs`，并支持复制。
 
 ---
 

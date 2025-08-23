@@ -25,6 +25,10 @@
         </a-checkbox>
       </a-space>
     </a-card>
+
+    <div style="margin-top:12px">
+      <logs-panel :logs="logsPanelLogs" title="操作日志" @open-logs="onOpenLogsDir" />
+    </div>
   </div>
 </template>
 
@@ -32,6 +36,7 @@
 import { ref, onMounted, onBeforeUnmount, computed, h } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import ModuleList from '@/renderer/components/ModuleList.vue';
+import LogsPanel from '@/renderer/components/LogsPanel.vue';
 import EnvCard from '@/renderer/components/EnvCard.vue';
 import { IPC } from '@/shared/ipc-contract';
 
@@ -39,6 +44,7 @@ const basicModules = ref<any[]>([]);
 const featureModules = ref<any[]>([]);
 const statusMap = ref<Record<string, { running: boolean; status: string; portsText: string; usedBy?: string[] }>>({});
 let timer: any = null;
+const logsPanelLogs = ref<Array<{ type: 'cmd' | 'stdout' | 'stderr' | 'info' | 'error'; text: string }>>([]);
 
 const globalConfig = ref<{ bindAddress?: string; autoStartDeps?: boolean; autoSuggestNextPort?: boolean; logToConsole?: boolean; autoStopUnusedDeps?: boolean }>({ logToConsole: true, autoStopUnusedDeps: false });
 
@@ -124,15 +130,19 @@ const onAction = async (action: string, name: string) => {
           console.groupCollapsed(label);
           // eslint-disable-next-line no-console
           console.log('> ' + payload.cmd);
+          logsPanelLogs.value.push({ type: 'cmd', text: String(payload.cmd || '') });
         } else if (evt === 'stdout') {
           // eslint-disable-next-line no-console
           console.log((payload.chunk || '').trim());
+          const t = String(payload.chunk || '').trim(); if (t) logsPanelLogs.value.push({ type: 'stdout', text: t });
         } else if (evt === 'stderr') {
           // eslint-disable-next-line no-console
           console.warn((payload.chunk || '').trim());
+          const t = String(payload.chunk || '').trim(); if (t) logsPanelLogs.value.push({ type: 'stderr', text: t });
         } else if (evt === 'error') {
           // eslint-disable-next-line no-console
           console.error(payload.message || 'stream error');
+          logsPanelLogs.value.push({ type: 'error', text: String(payload.message || 'stream error') });
         } else if (evt === 'end') {
           // eslint-disable-next-line no-console
           console.groupEnd();
@@ -161,8 +171,11 @@ const onAction = async (action: string, name: string) => {
         for (const it of logs) {
           // eslint-disable-next-line no-console
           console.log('> ' + it.cmd);
+          logsPanelLogs.value.push({ type: 'cmd', text: String(it.cmd || '') });
           if (it.stdout) console.log((it.stdout || '').trim());
+          if (it.stdout) { const t = String(it.stdout || '').trim(); if (t) logsPanelLogs.value.push({ type: 'stdout', text: t }); }
           if (it.stderr) console.warn((it.stderr || '').trim());
+          if (it.stderr) { const t = String(it.stderr || '').trim(); if (t) logsPanelLogs.value.push({ type: 'stderr', text: t }); }
         }
         // eslint-disable-next-line no-console
         console.groupEnd();
@@ -235,4 +248,9 @@ const onToggleAutoStopUnusedDeps = async () => {
     await (window as any).api.invoke('ai/config/set', { global: { autoStopUnusedDeps: !!globalConfig.value.autoStopUnusedDeps } });
   } catch {}
 };
+
+function onOpenLogsDir() {
+  // 目前未提供主进程日志目录 IPC，先给出提示
+  message.info('打开日志目录：TODO');
+}
 </script>
