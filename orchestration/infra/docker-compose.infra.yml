@@ -1,0 +1,69 @@
+# Infra compose: 基础服务（可被多个模块共享）。
+# 使用统一 external 网络与命名卷；此文件不负责创建这些 external 资源。
+
+networks:
+  ai-server-net:
+    external: true
+
+volumes:
+  ai-server-mysql-data:
+    external: true
+  ai-server-redis-data:
+    external: true
+  ai-server-minio-data:
+    external: true
+  ai-server-es-data:
+    external: true
+  ai-server-logs:
+    external: true
+
+services:
+  mysql:
+    image: mysql:8.0.36
+    container_name: ai-mysql
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MYSQL_HOST_PORT:-13306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      # 默认创建供应用使用的数据库/用户（仅在第一次初始化空数据卷时生效）
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-oneapi}
+      MYSQL_USER: ${MYSQL_USER:-oneapi}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-oneapi_pwd}
+    command: ["mysqld", "--default-authentication-plugin=mysql_native_password"]
+    volumes:
+      - ai-server-mysql-data:/var/lib/mysql
+      - ai-server-logs:/var/log/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -proot || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    labels:
+      com.ai.role: "basic"
+      com.ai.service: "mysql"
+      com.ai.stack: "ai-server"
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${REDIS_HOST_PORT:-16379}:6379"
+    volumes:
+      - ai-server-redis-data:/data
+      - ai-server-logs:/var/log/redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    labels:
+      com.ai.role: "basic"
+      com.ai.service: "redis"
+      com.ai.stack: "ai-server"

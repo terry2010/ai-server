@@ -24,6 +24,7 @@ export const IPC = {
   DockerStart: 'ai/docker/startDocker',
   ModulesList: 'ai/modules/list',
   ModuleStart: 'ai/module/start',
+  ModuleFirstStart: 'ai/module/firstStart',
   ModuleStop: 'ai/module/stop',
   ModuleStatus: 'ai/module/status',
   ModuleClear: 'ai/module/clear',

@@ -1,0 +1,26 @@
+# OneAPI feature compose placeholder
+# 使用统一外部网络与基础卷（external），仅描述模块自身容器
+
+networks:
+  ai-server-net:
+    external: true
+
+services:
+  oneapi:
+    image: justsong/one-api:v0.6.11-preview.7
+    container_name: ai-oneapi
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ONEAPI_HOST_PORT:-18000}:3000"  # 固定容器内端口 3000
+    environment:
+      # 数据库配置：与 infra 中 MySQL 初始化的数据库/用户/密码保持一致
+      - SQL_DSN=${ONEAPI_SQL_DSN:-oneapi:oneapi_pwd@tcp(ai-mysql:3306)/oneapi?charset=utf8mb4&parseTime=True&loc=Local}
+      # Redis（infra 默认无密码）
+      - REDIS_CONN=${ONEAPI_REDIS_CONN:-redis://ai-redis:6379/0}
+    labels:
+      com.ai.role: "feature"
+      com.ai.module: "oneapi"
+      com.ai.requires: "mysql,redis"
+      com.ai.stack: "ai-server"
