@@ -1,0 +1,64 @@
+{
+  "name": "ai-server-electron-proto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/app.cjs",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "dev:kill": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference='SilentlyContinue'; Get-Process electron -ErrorAction SilentlyContinue | Stop-Process -Force; Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*vite*' -or $_.Path -like '*tsup*' } | Stop-Process -Force; if (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue) { foreach ($p in 5173,5174) { Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force } } } ; exit 0\"",
+    "dev:all": "npm run dev:kill && concurrently -n main,renderer,electron -c blue,green,magenta \"npm:dev:main\" \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:main": "tsup src/main/app.ts src/main/preload.ts --format=cjs --dts --sourcemap --watch --out-dir=out/main --external electron",
+    "dev:renderer": "vite",
+    "dev:electron": "node scripts/start-electron.cjs",
+    "build:main": "tsup src/main/app.ts src/main/preload.ts --format=cjs --dts --sourcemap --out-dir=out/main --external electron",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "dist": "npm run build && electron-builder -w"
+  },
+  "build": {
+    "appId": "com.example.aiserver",
+    "productName": "AI-Server",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/main/**",
+      "dist/renderer/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.icns"
+    }
+  },
+  "dependencies": {
+    "ant-design-vue": "^4.0.0",
+    "pinia": "^2.1.7",
+    "vue": "^3.5.0",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "concurrently": "^8.2.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.9.1",
+    "cross-env": "^7.0.3",
+    "less": "^4.2.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.4.0",
+    "vite": "^5.0.0",
+    "wait-on": "^7.0.1"
+  }
+}

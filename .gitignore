@@ -1,2 +1,8 @@
 /doc/bin/
-/doc/system-code1
+/doc/system-code
+/node_modules
+/out
+/.vscode
+/.idea
+
+
