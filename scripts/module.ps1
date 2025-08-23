@@ -1,14 +1,16 @@
 param(
   [Parameter(Mandatory=$true)][string]$Name,
   [Parameter(Mandatory=$true)][ValidateSet('start','stop','status','clear')][string]$Action,
-  [switch]$Force
+  [switch]$Force,
+  [int]$ApiPort
 )
 
 $ErrorActionPreference = 'Stop'
 
 function Invoke-ModuleScript {
   param([string]$ModuleName, [string]$ScriptName, [hashtable]$ScriptArgs)
-  $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath "modules/$ModuleName/$ScriptName.ps1"
+  $baseRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+  $scriptPath = Join-Path -Path $baseRoot -ChildPath "modules/$ModuleName/$ScriptName.ps1"
   if (-not (Test-Path $scriptPath)) {
     Write-Error "Module script not found: $scriptPath"
     exit 2
@@ -18,7 +20,11 @@ function Invoke-ModuleScript {
 }
 
 switch ($Action) {
-  'start' { Invoke-ModuleScript -ModuleName $Name -ScriptName 'start' -ScriptArgs @{} }
+  'start' {
+    $startArgs = @{}
+    if ($PSBoundParameters.ContainsKey('ApiPort')) { $startArgs.ApiPort = $ApiPort }
+    Invoke-ModuleScript -ModuleName $Name -ScriptName 'start' -ScriptArgs $startArgs
+  }
   'stop'  { Invoke-ModuleScript -ModuleName $Name -ScriptName 'stop' -ScriptArgs @{} }
   'status'{ Invoke-ModuleScript -ModuleName $Name -ScriptName 'status' -ScriptArgs @{} }
   'clear' {

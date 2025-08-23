@@ -127,4 +127,8 @@ PowerShell 脚本（Win10，强制）：
 
 ---
 
-项目已经开发了几天了，你要审阅项目， 确认项目开发进度， 并把开发进度 和 接下来要做的todo 写到 doc 的新文件中
+项目已经开发了几天了，你要审阅项目， 确认C:\code\ai-server\doc\AI-Server-开发进度与待办-2025-08-24.md 写的是否正确
+
+接下来你要集中精神把 dify 集成到这个项目里， 如果你对dify 有什么不清楚的， 我把最新的源码clone 到 C:\code\ai-server\doc\system-code\dify 里了，你可以随时查看
+
+你要先写出今日todo 文档并保存到 doc目录中， 然后进入开发

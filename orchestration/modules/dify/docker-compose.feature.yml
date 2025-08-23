@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  dify-api:
+    image: langgenius/dify-api:1.7.2
+    container_name: ai-dify-api
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${DIFY_API_PORT:-18091}:5001"
+    labels:
+      com.ai.role: feature
+      com.ai.module: dify
+      com.ai.requires: mysql,redis
+      com.ai.stack: ai-server
+    environment:
+      # 数据库（复用外部 mysql 基础服务）
+      DIFY_DB_HOST: ${DIFY_DB_HOST:-127.0.0.1}
+      DIFY_DB_PORT: ${DIFY_DB_PORT:-13306}
+      DIFY_DB_USER: ${DIFY_DB_USER:-root}
+      DIFY_DB_PASS: ${DIFY_DB_PASS:-root}
+      DIFY_DB_NAME: ${DIFY_DB_NAME:-dify}
+      # Redis（复用外部 redis 基础服务）
+      DIFY_REDIS_HOST: ${DIFY_REDIS_HOST:-127.0.0.1}
+      DIFY_REDIS_PORT: ${DIFY_REDIS_PORT:-16379}
+      # 存储（OPENDAL 本地文件系统）
+      OPENDAL_SCHEME: fs
+      OPENDAL_FS_ROOT: /data/storage
+      # Dify 官方 CORS 配置
+      WEB_API_CORS_ALLOW_ORIGINS: "*"
+      CONSOLE_CORS_ALLOW_ORIGINS: "*"
+      CONSOLE_WEB_URL: http://127.0.0.1:${DIFY_WEB_PORT:-18090}
+      WEB_API_URL: http://127.0.0.1:${DIFY_API_PORT:-18091}
+      APP_WEB_URL: http://127.0.0.1:${DIFY_WEB_PORT:-18090}
+    volumes:
+      - ai-dify-data:/data
+    # 不在 compose 中写 depends_on（跨文件），由主进程按依赖拓扑启动
+
+  dify-web:
+    image: langgenius/dify-web:1.7.2
+    container_name: ai-dify-web
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    labels:
+      com.ai.role: feature
+      com.ai.module: dify
+      com.ai.requires: mysql,redis
+      com.ai.stack: ai-server
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${DIFY_WEB_PORT:-18090}:3000"
+    environment:
+      # Web 通过 API 内部网络访问，无需暴露 API 端口
+      DIFY_API_URL: http://ai-dify-api:5001
+      # 供前端 JS 使用的 API 根地址（指向宿主映射端口）
+      CONSOLE_API_URL: http://127.0.0.1:${DIFY_API_PORT:-18091}
+      NEXT_PUBLIC_CONSOLE_API_URL: http://127.0.0.1:${DIFY_API_PORT:-18091}
+    # 不在 compose 中写 depends_on（跨文件），由主进程按依赖拓扑启动
+
+networks:
+  ai-server-net:
+    external: true
+
+volumes:
+  ai-dify-data:
