@@ -1,7 +1,7 @@
 {
   "name": "dify",
   "type": "feature",
-  "dependsOn": ["mysql", "redis"],
+  "dependsOn": ["postgres", "redis"],
   "ports": [
     { "container": 3000, "host": "${DIFY_WEB_PORT:18090}", "bind": "${BIND_ADDRESS:127.0.0.1}" },
     { "container": 5001, "host": "${DIFY_API_PORT:18091}", "bind": "${BIND_ADDRESS:127.0.0.1}" }

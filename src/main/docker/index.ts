@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import type { WebContents } from 'electron';
 import { waitHealth } from './health';
 import { spawnStream } from './log-stream';
-import { containerNameFor, serviceNameFor } from './naming';
+import { containerNameFor, serviceNameFor, servicesForModule } from './naming';
 import { ensureExternalResources, ensureExternalInfraResources } from './resources';
 import { getFeatureComposePath, resolveDefaultVar, materializeFeatureCompose } from './template';
 import { checkPortsConflict } from './ports';
@@ -154,17 +154,8 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
     const tpl = materializeFeatureCompose(name);
     if (!tpl.ok) return { success: false, code: (tpl as any).code, message: (tpl as any).message, data: { logs } };
     const featureCompose = (tpl as any).path;
-    const cname = containerNameFor(name);
-    const runningSet = await listRunningContainerNames();
-    const allSet = await listAllContainerNames();
-    if (runningSet.has(cname)) {
-      // 已在运行，跳过 compose
-    } else if (allSet.has(cname)) {
-      await execAndLog(`docker start ${cname}`, logs);
-    } else {
-      const r = await composeUp(featureCompose, [serviceNameFor(name)]);
-      if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动模块失败', data: { logs } };
-    }
+    const r = await composeUp(featureCompose, servicesForModule(name));
+    if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动模块失败', data: { logs } };
   } else {
     // basic 模块：走 infra 文件（同样避免与现存容器冲突）
     const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
@@ -201,10 +192,8 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
     const tpl = getFeatureComposePath(name);
     if (!tpl.ok) return { success: false, code: tpl.code, message: tpl.message, data: { logs } };
     const featureCompose = tpl.path;
-    {
-      const r = await composeStop(featureCompose, [serviceNameFor(name)]);
-      if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败', data: { logs } };
-    }
+    const r = await composeStop(featureCompose, servicesForModule(name));
+    if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败', data: { logs } };
   } else {
     // basic 模块：在停止前进行占用检查——若仍被运行中的 feature 依赖，阻止
     const reg2 = loadRegistry();
@@ -225,14 +214,14 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
       if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败', data: { logs } };
     }
   }
-  // 兜底：若容器仍在运行，直接 docker stop 容器名
-  try {
-    const cname = containerNameFor(name);
-    const set = await listRunningContainerNames();
-    if (set.has(cname)) {
-      await execAndLog(`docker stop ${cname}`, logs);
-    }
-  } catch {}
+  // 兜底：仅对 basic 模块执行单容器 stop
+  if (target.type !== 'feature') {
+    try {
+      const cname = containerNameFor(name);
+      const set = await listRunningContainerNames();
+      if (set.has(cname)) await execAndLog(`docker stop ${cname}`, logs);
+    } catch {}
+  }
   // 依赖感知回收（可选）：仅当全局开关 autoStopUnusedDeps=true 才尝试停止未被占用的基础服务
   try {
     const { autoStopUnusedDeps } = getGlobalConfig() as any;
@@ -399,18 +388,8 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
     const tpl = materializeFeatureCompose(name);
     if (!tpl.ok) return { success: false, code: (tpl as any).code, message: (tpl as any).message };
     const featureCompose = (tpl as any).path;
-    const cname = containerNameFor(name);
-    const runningSet = await listRunningContainerNames();
-    const allSet = await listAllContainerNames();
-    if (runningSet.has(cname)) {
-      // 已在运行
-    } else if (allSet.has(cname)) {
-      const r = await startContainerStream(cname, sender, streamId);
-      if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动容器失败' };
-    } else {
-      const r = await composeUpStream(featureCompose, [serviceNameFor(name)], sender, streamId);
-      if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动模块失败' };
-    }
+    const r = await composeUpStream(featureCompose, servicesForModule(name), sender, streamId);
+    if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动模块失败' };
   } else {
     const infraCompose = path.join(process.cwd(), 'orchestration', 'infra', 'docker-compose.infra.yml');
     const cname = containerNameFor(name);
@@ -442,7 +421,7 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
     const tpl = getFeatureComposePath(name);
     if (!tpl.ok) return { success: false, code: tpl.code, message: tpl.message };
     const featureCompose = tpl.path;
-    const r = await composeStopStream(featureCompose, [serviceNameFor(name)], sender, streamId);
+    const r = await composeStopStream(featureCompose, servicesForModule(name), sender, streamId);
     if (!r.ok) return { success: false, code: r.code as any, message: r.message || '停止模块失败' };
   } else {
     // basic 模块：在停止前进行占用检查——若仍被运行中的 feature 依赖，阻止
@@ -459,11 +438,14 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
     const r2 = await composeStopStream(infraCompose, [serviceNameFor(name)], sender, streamId);
     if (!r2.ok) return { success: false, code: r2.code as any, message: r2.message || '停止模块失败' };
   }
-  try {
-    const cname = containerNameFor(name);
-    const set = await listRunningContainerNames();
-    if (set.has(cname)) await spawnStream(`docker stop ${cname}`, sender, streamId);
-  } catch {}
+  // 兜底：仅 basic 模块执行单容器 stop
+  if (target.type !== 'feature') {
+    try {
+      const cname = containerNameFor(name);
+      const set = await listRunningContainerNames();
+      if (set.has(cname)) await spawnStream(`docker stop ${cname}`, sender, streamId);
+    } catch {}
+  }
   // 依赖感知回收（可选）：仅当全局开关 autoStopUnusedDeps=true 才尝试停止未被占用的基础服务（仅 feature 停止时考虑）
   try {
     if (target.type === 'feature') {

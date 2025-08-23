@@ -14,6 +14,8 @@ volumes:
     external: true
   ai-server-es-data:
     external: true
+  ai-server-postgres-data:
+    external: true
   ai-server-logs:
     external: true
 
@@ -66,4 +68,29 @@ services:
     labels:
       com.ai.role: "basic"
       com.ai.service: "redis"
+      com.ai.stack: "ai-server"
+
+  postgres:
+    image: postgres:16
+    container_name: ai-postgres
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-15432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ai_server}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_server_123}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_server}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ai-server-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_server} -d ${POSTGRES_DB:-ai_server} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    labels:
+      com.ai.role: "basic"
+      com.ai.service: "postgres"
       com.ai.stack: "ai-server"

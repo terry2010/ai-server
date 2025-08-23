@@ -59,6 +59,7 @@ if (-not $Force) {
 # 1) stop and remove containers
 Stop-ContainerByName -Name 'ai-mysql'
 Stop-ContainerByName -Name 'ai-redis'
+Stop-ContainerByName -Name 'ai-postgres'
 if ($IncludeModules) {
   Remove-ContainersByPrefix -Prefix 'ai-'
 }
@@ -69,6 +70,7 @@ $volumes = @(
   'ai-server-redis-data',
   'ai-server-minio-data',
   'ai-server-es-data',
+  'ai-server-postgres-data',
   'ai-server-logs'
 )
 foreach ($v in $volumes) { Remove-VolumeIfExists -Name $v }

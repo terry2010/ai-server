@@ -8,7 +8,8 @@ param(
   [string]$DbPass = 'root',
   [string]$DbName = 'dify',
   [string]$RedisHost = '127.0.0.1',
-  [int]$RedisPort = 16379
+  [int]$RedisPort = 16379,
+  [switch]$EnableMigration
 )
 $ErrorActionPreference = 'Stop'
 
@@ -45,6 +46,8 @@ try { $composePath = (Resolve-Path $composePath).Path } catch {}
 $env:BIND_ADDRESS = $BindAddress
 $env:DIFY_WEB_PORT = [string]$HostPort
 $env:DIFY_API_PORT = [string]$ApiPort
+
+# 兼容旧参数（若仍通过本机端口连外部服务，可继续使用这些变量）
 $env:DIFY_DB_HOST = $DbHost
 $env:DIFY_DB_PORT = [string]$DbPort
 $env:DIFY_DB_USER = $DbUser
@@ -52,6 +55,13 @@ $env:DIFY_DB_PASS = $DbPass
 $env:DIFY_DB_NAME = $DbName
 $env:DIFY_REDIS_HOST = $RedisHost
 $env:DIFY_REDIS_PORT = [string]$RedisPort
+
+# 启用 API 侧数据库迁移（默认启用）
+if ($EnableMigration -or $true) {
+  if (-not $env:DIFY_SECRET_KEY) { $env:DIFY_SECRET_KEY = 'please-change-me' }
+  $env:MIGRATION_ENABLED = 'true'
+  Write-Host '[dify] MIGRATION_ENABLED=true (Alembic 将在 api 启动时自动迁移)'
+}
 
 # 幂等启动（不重建）
 Write-Host '[dify] starting via docker compose (api/web)'

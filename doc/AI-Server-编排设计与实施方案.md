@@ -39,7 +39,25 @@
 
 说明：采用“生产 Postgres + Redis”方案以获得更好的并发与可扩展性（多实例/多 worker、行级锁、稳定吞吐），不使用最简 SQLite 方案。
 
- 
+### 7.4 Dify 版本矩阵与依赖（Postgres + Redis）
+
+- 功能容器：
+  - API：`langgenius/dify-api:1.7.2`
+  - Web：`langgenius/dify-web:1.7.2`
+- 基础服务：
+  - 数据库：Postgres `16`（服务名 `postgres`，容器名 `ai-postgres`）
+  - 缓存：Redis `7.2-alpine`（服务名 `redis`，容器名 `ai-redis`）
+- 网络与卷：
+  - 网络：均加入 `ai-server-net`（external: true）
+  - 卷：`ai-server-postgres-data`（Postgres 数据），`ai-server-redis-data`（Redis 数据），`ai-dify-data`（Dify 持久化）
+- 端口映射（默认，仅宿主可配）：
+  - Dify Web: `127.0.0.1:${DIFY_WEB_PORT:-18090} -> 3000`
+  - Dify API: `127.0.0.1:${DIFY_API_PORT:-18091} -> 5001`
+- 启动提示：
+  - 先启动基础设施：`docker compose -f orchestration/infra/docker-compose.infra.yml up -d postgres redis`
+  - 再启动 Dify：`./scripts/module.ps1 -Name dify -Action start -ApiPort 18091`
+  - 已启用 `MIGRATION_ENABLED=true`，容器启动时自动执行 Alembic 迁移（等价 `flask db upgrade`）。对已有数据执行增量迁移，正常不丢数据；生产建议先做数据库快照。
+
 ## 1. 目标与原则
 
 - 以模块为粒度进行持续集成：Dify、RagFlow、n8n、OneAPI 等。

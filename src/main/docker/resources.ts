@@ -25,6 +25,7 @@ export async function ensureExternalResources(logs?: LogEntry[]): Promise<void> 
     'ai-server-redis-data',
     'ai-server-minio-data',
     'ai-server-es-data',
+    'ai-server-postgres-data',
     'ai-server-logs',
   ];
   try {

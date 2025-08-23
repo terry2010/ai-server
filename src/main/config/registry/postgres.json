@@ -1,0 +1,16 @@
+{
+  "name": "postgres",
+  "type": "basic",
+  "dependsOn": [],
+  "image": "postgres:16",
+  "ports": [
+    { "container": 5432, "host": "${POSTGRES_HOST_PORT:15432}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+  ],
+  "variables": {
+    "POSTGRES_USER": "${POSTGRES_USER:ai_server}",
+    "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:ai_server_123}",
+    "POSTGRES_DB": "${POSTGRES_DB:ai_server}"
+  },
+  "healthCheck": { "type": "tcp", "target": "localhost:${POSTGRES_HOST_PORT:15432}", "interval": 2000, "timeout": 15000, "retries": 20 },
+  "compose": { "templateRef": "postgres" }
+}

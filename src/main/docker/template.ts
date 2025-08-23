@@ -40,7 +40,8 @@ export function renderComposeTemplate(_name: string, _vars: Record<string, any>)
 // 解析形如 ${VAR:default} 的默认值，或返回 fallback
 export function resolveDefaultVar(expr: string, fallback?: string): string | undefined {
   if (!expr) return fallback;
-  const m = expr.match(/^\$\{[^:}]+:([^}]+)}/);
+  // 支持 ${VAR:-default} 与 ${VAR:default}
+  const m = expr.match(/^\$\{[^:}]+:-?([^}]+)}/);
   if (m && m[1]) return m[1];
   if (/^\d+$/.test(expr)) return expr; // 数字
   if (/^\d+\.\d+\.\d+\.\d+$/.test(expr)) return expr; // IPv4
@@ -50,7 +51,8 @@ export function resolveDefaultVar(expr: string, fallback?: string): string | und
 // 将字符串中的多个 ${VAR:default} 占位按默认值替换（不读取环境变量，先满足默认值场景）
 export function resolveVarsInString(s?: string): string | undefined {
   if (!s) return s;
-  return s.replace(/\$\{[^:}]+:([^}]+)}/g, (_all, dflt) => String(dflt));
+  // 将 ${VAR:-default} 或 ${VAR:default} 用默认值替换
+  return s.replace(/\$\{[^:}]+:-?([^}]+)}/g, (_all, dflt) => String(dflt));
 }
 
 function isPlainObject(v: any): v is Record<string, any> {
@@ -71,7 +73,8 @@ function deepMerge<T>(a: T, b: any): T {
 }
 
 function replaceVarsInStringWithDict(s: string, dict: Record<string, string>, missing: Set<string>): string {
-  return s.replace(/\$\{([A-Za-z0-9_]+)(?::([^}]+))?}/g, (_all, varName: string, dflt?: string) => {
+  // 支持 ${VAR}、${VAR:default}、${VAR:-default}
+  return s.replace(/\$\{([A-Za-z0-9_]+)(?::-?([^}]+))?}/g, (_all, varName: string, dflt?: string) => {
     const key = String(varName);
     const hasVal = Object.prototype.hasOwnProperty.call(dict, key) && dict[key] != null;
     if (hasVal) return String(dict[key]);
@@ -140,7 +143,11 @@ export function materializeFeatureCompose(name: string): TemplateResult {
   const varsDict: Record<string, string> = {};
   try {
     const mod = reg?.byName?.[name];
-    if (mod?.variables) for (const [k, v] of Object.entries(mod.variables)) varsDict[k] = String(v);
+    if (mod?.variables) for (const [k, v] of Object.entries(mod.variables)) {
+      const raw = String(v);
+      const parsed = resolveDefaultVar(raw);
+      varsDict[k] = parsed ?? raw;
+    }
     const g = getGlobalConfig();
     for (const [k, v] of Object.entries(g as any)) varsDict[k] = String(v);
     for (const [k, v] of Object.entries(process.env)) if (typeof v === 'string') varsDict[k] = v;
