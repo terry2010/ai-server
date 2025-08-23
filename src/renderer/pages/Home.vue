@@ -37,7 +37,7 @@ import { IPC } from '@/shared/ipc-contract';
 
 const basicModules = ref<any[]>([]);
 const featureModules = ref<any[]>([]);
-const statusMap = ref<Record<string, { running: boolean; status: string; portsText: string }>>({});
+const statusMap = ref<Record<string, { running: boolean; status: string; portsText: string; usedBy?: string[] }>>({});
 let timer: any = null;
 
 const globalConfig = ref<{ bindAddress?: string; autoStartDeps?: boolean; autoSuggestNextPort?: boolean; logToConsole?: boolean; autoStopUnusedDeps?: boolean }>({ logToConsole: true, autoStopUnusedDeps: false });
@@ -187,9 +187,9 @@ const pollStatuses = async () => {
       const portsText = Object.entries(data.ports || {})
         .filter(([containerName]) => String(containerName).includes(m.name))
         .map(([, v]) => String(v)).join(' | ');
-      statusMap.value[m.name] = { running: !!data.running, status: String(data.status), portsText };
+      statusMap.value[m.name] = { running: !!data.running, status: String(data.status), portsText, usedBy: (data.usedBy || []) as string[] };
     } catch {
-      statusMap.value[m.name] = { running: false, status: 'error', portsText: '' };
+      statusMap.value[m.name] = { running: false, status: 'error', portsText: '', usedBy: [] };
     }
   }
 };
@@ -198,7 +198,8 @@ const basicView = computed(() => basicModules.value.map(m => ({
   ...m,
   running: statusMap.value[m.name]?.running ?? false,
   status: statusMap.value[m.name]?.status ?? 'stopped',
-  portsText: statusMap.value[m.name]?.portsText ?? ''
+  portsText: statusMap.value[m.name]?.portsText ?? '',
+  usedBy: statusMap.value[m.name]?.usedBy ?? []
 })));
 
 const featureView = computed(() => featureModules.value.map(m => ({

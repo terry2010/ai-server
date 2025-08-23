@@ -12,6 +12,17 @@
             <a-typography-text type="secondary" v-if="m.portsText">{{ m.portsText }}</a-typography-text>
           </a-space>
         </div>
+        <div v-if="m.type==='basic'" style="margin-bottom:8px">
+          <a-typography-text type="secondary">占用：</a-typography-text>
+          <template v-if="m.usedBy && m.usedBy.length">
+            <a-space wrap>
+              <a-tag v-for="u in m.usedBy" :key="u" color="purple">{{ u }}</a-tag>
+            </a-space>
+          </template>
+          <template v-else>
+            <a-tag>未被占用</a-tag>
+          </template>
+        </div>
         <a-space>
           <a-button v-if="m.type==='feature'" size="small" type="dashed" @click="$emit('action','firstStart', m.name)">真实首次启动</a-button>
           <a-button size="small" type="primary" @click="$emit('action','start', m.name)">启动</a-button>
@@ -26,5 +37,5 @@
 <script lang="ts" setup>
 import { defineProps } from 'vue';
 
-defineProps<{ items: Array<{ name: string; type: 'basic'|'feature'; running?: boolean; status?: string; portsText?: string }>; type: 'basic'|'feature' }>();
+defineProps<{ items: Array<{ name: string; type: 'basic'|'feature'; running?: boolean; status?: string; portsText?: string; usedBy?: string[] }>; type: 'basic'|'feature' }>();
 </script>

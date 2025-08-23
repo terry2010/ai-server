@@ -18,7 +18,7 @@ export interface EnvDiagnoseResult {
 }
 
 export interface ModuleItem { name: string; type: ModuleType; }
-export interface ModuleStatus { running: boolean; status: 'running' | 'stopped' | 'error' | 'parse_error'; ports: Record<string, string>; }
+export interface ModuleStatus { running: boolean; status: 'running' | 'stopped' | 'error' | 'parse_error'; ports: Record<string, string>; usedBy?: string[] }
 
 // 统一错误码（与文档第11章保持一致，按需增补）
 export type ErrorCode =

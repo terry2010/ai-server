@@ -36,6 +36,35 @@ export function listModules(): ModuleItem[] {
 
 // 外部基础资源确保由 ./resources 提供
 
+// ===== 依赖环检测 =====
+function detectDepCycle(mods: any[], start: string): { ok: true } | { ok: false; path: string[] } {
+  const byName: Record<string, any> = {};
+  for (const m of mods) byName[m.name] = m;
+  const visited = new Set<string>();
+  const stack = new Set<string>();
+  const path: string[] = [];
+  function dfs(n: string): boolean {
+    if (stack.has(n)) { path.push(n); return true; }
+    if (visited.has(n)) return false;
+    visited.add(n); stack.add(n); path.push(n);
+    const deps = (byName[n]?.dependsOn || []) as string[];
+    for (const d of deps) {
+      if (dfs(d)) return true;
+    }
+    stack.delete(n); path.pop();
+    return false;
+  }
+  const has = dfs(start);
+  if (has) {
+    // 将栈中最后出现的重复节点作为环起点，裁剪路径
+    const loopStart = path[path.length - 1];
+    const firstIdx = path.indexOf(loopStart);
+    const cyc = path.slice(firstIdx);
+    return { ok: false, path: cyc };
+  }
+  return { ok: true };
+}
+
 export async function firstStartModule(name: ModuleName): Promise<IpcResponse> {
   const logs: LogEntry[] = [];
   const running = await dockerRunning();
@@ -63,6 +92,11 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
   const modules = reg.modules || [];
   const target = modules.find(m => m.name === name);
   if (!target) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
+  // 依赖环检测
+  {
+    const cyc = detectDepCycle(modules as any[], name);
+    if (!cyc.ok) return { success: false, code: 'E_DEP_CYCLE', message: `依赖存在环: ${cyc.path.join(' -> ')}` };
+  }
 
   const deps = (target.dependsOn || []) as ModuleName[];
 
@@ -173,6 +207,7 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
       const runningSet = await listRunningContainerNames();
       const inUse = users.some(u => runningSet.has(containerNameFor(u.name)));
       if (inUse) {
+        logs.push({ cmd: `[dep] block stop basic ${name}: in use by ${users.map(u=>u.name).join(', ')}` });
         return { success: false, code: 'E_IN_USE', message: `基础服务 ${name} 仍被运行中的功能模块依赖，已阻止停止。` };
       }
     }
@@ -204,7 +239,10 @@ export async function stopModule(name: ModuleName): Promise<IpcResponse> {
           // 精确判断：是否存在运行中的依赖者（按容器名精确匹配）
           const inUse = users.some(u => runningNames.has(containerNameFor(u.name)));
           if (!inUse) {
+            logs.push({ cmd: `[dep] auto-stop unused basic ${dep}` });
             await execAndLog(`${compose} -f ${infraCompose} stop ${serviceNameFor(dep)}`, logs);
+          } else {
+            logs.push({ cmd: `[dep] keep basic ${dep}: in use by ${users.map(u=>u.name).join(', ')}` });
           }
         }
       }
@@ -246,7 +284,18 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
     if (state === 'running') status = 'running';
     else if (state === 'restarting') status = 'error';
     else if (state === 'exited' || state === 'dead') status = 'error';
-    return { success: true, data: { running, status, ports } };
+    // usedBy 计算（仅当该模块为基础服务时才有意义）
+    const reg = loadRegistry();
+    const mods = reg.modules || [];
+    const self = mods.find(m => m.name === name);
+    let usedBy: string[] | undefined = undefined;
+    if (self && self.type === 'basic') {
+      const runningSet = await listRunningContainerNames();
+      const users = mods.filter(m => m.type === 'feature' && (m.dependsOn || []).includes(name));
+      const activeUsers = users.filter(u => runningSet.has(containerNameFor(u.name))).map(u => u.name);
+      usedBy = activeUsers;
+    }
+    return { success: true, data: { running, status, ports, usedBy } };
   } catch (e: any) {
     return { success: false, code: 'E_RUNTIME', message: String(e?.message ?? e) };
   }
@@ -291,6 +340,11 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
   const modules = reg.modules || [];
   const target = modules.find(m => m.name === name);
   if (!target) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
+  // 依赖环检测
+  {
+    const cyc = detectDepCycle(modules as any[], name);
+    if (!cyc.ok) return { success: false, code: 'E_DEP_CYCLE', message: `依赖存在环: ${cyc.path.join(' -> ')}` };
+  }
 
   const deps = (target.dependsOn || []) as ModuleName[];
 
@@ -390,6 +444,7 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
       const runningSet = await listRunningContainerNames();
       const inUse = users.some(u => runningSet.has(containerNameFor(u.name)));
       if (inUse) {
+        await spawnStream(`[dep] block stop basic ${name}: in use by ${users.map(u=>u.name).join(', ')}`, sender, streamId);
         return { success: false, code: 'E_IN_USE', message: `基础服务 ${name} 仍被运行中的功能模块依赖，已阻止停止。` };
       }
     }
@@ -415,7 +470,11 @@ export async function stopModuleStream(name: ModuleName, sender: WebContents, st
             const users = modules.filter(m => m.name !== name && m.type === 'feature' && (m.dependsOn || []).includes(dep));
             const inUse = users.some(u => runningNames.has(containerNameFor(u.name)));
             if (!inUse) {
+              await spawnStream(`[dep] auto-stop unused basic ${dep}`, sender, streamId);
               await composeStopStream(infraCompose, [serviceNameFor(dep)], sender, streamId);
+            }
+            else {
+              await spawnStream(`[dep] keep basic ${dep}: in use by ${users.map(u=>u.name).join(', ')}`, sender, streamId);
             }
           }
         }

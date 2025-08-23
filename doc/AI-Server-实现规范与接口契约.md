@@ -109,7 +109,8 @@
   - 出参：`{ success, message? }`
 - `ai/module/status`
   - 入参：同上
-  - 出参：`{ running: boolean, status: 'running'|'stopped'|'error'|'parse_error', ports: Record<string,string> }`
+  - 出参：`{ running: boolean, status: 'running'|'stopped'|'error'|'parse_error', ports: Record<string,string>, usedBy?: string[] }`
+    - `usedBy`：可选，仅当查询对象为基础服务（basic）时返回其被哪些运行中的功能模块占用（模块名数组）。
 - `ai/module/clear`
   - 入参：同上
   - 出参：`{ success, message }`
@@ -121,6 +122,8 @@
   - 出参：`{ success, message? }`
 
 错误码扩展（可选）：`code` 使用字符串，如 `E_DOCKER_NOT_INSTALLED`、`E_COMPOSE_FAILED`，便于 UI 显示定制文案。
+  - `E_IN_USE`：当尝试停止某基础服务时，该服务仍被至少一个运行中的功能模块依赖；应阻止停止。
+  - `E_DEP_CYCLE`：在启动流程前检测到依赖图存在有向环，返回并中止启动；`message` 包含环路路径（如 `a -> b -> c -> a`）。
 
 ---
 
@@ -194,6 +197,12 @@ function generateComposeFromTemplate(module, mergedConfig) {
   - 功能模块（feature）：停止自身；随后遍历其依赖的基础服务，判断是否仍被其他运行中的功能模块使用；若无人使用则可选择停止对应基础服务（默认不自动停止，可作为“智能回收”选项）。
 
 上述语义需由主进程实现，并通过 IPC 提供给渲染端；渲染端仅触发动作与展示结果。
+
+#### 6.1.1 全局配置：autoStopUnusedDeps（智能回收）
+- 类型：`boolean`，默认值 `false`。
+- 含义：当停止一个功能模块时，若开启该开关，将自动停止其依赖的、且当前不再被任何运行中的功能模块占用的基础服务模块。
+- 安全性：默认关闭，需用户在“配置中心”勾选启用。关闭时不会触发自动回收，基础服务需手动停止。
+- UI：`src/renderer/pages/Home.vue` 的“配置中心”中提供复选框；通过 `ai/config/set` 同步到主进程。
 
 ### 6.2 PS1 脚本一致性
 
