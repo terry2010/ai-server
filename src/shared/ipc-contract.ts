@@ -3,6 +3,8 @@ export type ModuleType = 'basic' | 'feature';
 
 export interface IpcResponse<T = any> {
   success: boolean;
+  // 标准化错误码（成功时可为空）
+  code?: ErrorCode;
   message?: string;
   data?: T;
 }
@@ -17,6 +19,21 @@ export interface EnvDiagnoseResult {
 
 export interface ModuleItem { name: string; type: ModuleType; }
 export interface ModuleStatus { running: boolean; status: 'running' | 'stopped' | 'error' | 'parse_error'; ports: Record<string, string>; }
+
+// 统一错误码（与文档第11章保持一致，按需增补）
+export type ErrorCode =
+  | 'E_COMPOSE_NOT_FOUND'
+  | 'E_TEMPLATE_MISSING'
+  | 'E_VAR_MISSING'
+  | 'E_PORT_CONFLICT'
+  | 'E_DEP_CYCLE'
+  | 'E_HEALTH_TIMEOUT'
+  | 'E_RUNTIME'
+  | 'E_PREFLIGHT_RESOURCE'
+  | 'E_EXT_CONN_FAIL'
+  | 'E_IMAGE_PULL'
+  | 'E_INIT_SCRIPT'
+  | 'E_FIRST_RUN_ABORTED';
 
 export const IPC = {
   EnvDiagnose: 'ai/env/diagnose',

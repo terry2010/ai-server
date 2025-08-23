@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC, type ModuleName } from '../../shared/ipc-contract';
-import { listModules, startModule, stopModule, getModuleStatus, clearModuleCache, firstStartModule, startModuleStream, stopModuleStream, firstStartModuleStream } from '../docker';
+import { listModules, startModule, stopModule, getModuleStatus, clearModuleCache, firstStartModule, startModuleStream, stopModuleStream, firstStartModuleStream } from '../docker/modules';
 
 ipcMain.handle(IPC.ModulesList, async () => ({ success: true, data: { items: listModules() } }));
 
