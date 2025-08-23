@@ -6,7 +6,7 @@ AI-Server 基于现有代码的增量开发 Prompt（Win10）
 权威文档：
 - `C:\code\ai-server\doc\AI-Server-编排设计与实施方案.md`
 - `C:\code\ai-server\doc\AI-Server-编排设计与实施方案.md`
-
+- `C:\code\ai-server\doc\脚本使用手册.md`
 ---
 
 ## 0. 执行原则
@@ -127,4 +127,4 @@ PowerShell 脚本（Win10，强制）：
 
 ---
 
-请立即在现有仓库基础上执行以上步骤，保证项目在 Windows 10 可启动、UI 可展示模块列表并完成基本启停与首次启动流程。
+项目已经开发了几天了，你要审阅项目， 确认项目开发进度， 并把开发进度 和 接下来要做的todo 写到 doc 的新文件中
