@@ -424,6 +424,75 @@ ai-server-logs/
 
 ---
 
+## 13. 开发与验收流程（模块级）
+
+本节用于指导每个功能模块（feature）与基础服务（basic）的增量开发、联调与验收。统一以 PowerShell 脚本在 Win10 环境验证启停与清理，确保工程外的运行一致性。
+
+### 13.1 脚本规范（Win10 PowerShell）
+
+- 统一调度脚本：`scripts/module.ps1`
+  - 用法：`./scripts/module.ps1 -Name <ModuleName> -Action start|stop|status|clear`
+  - 行为：
+    - `start`：按第5章启停算法，触发依赖启动与模块启动（可调用主进程 CLI 或直接 docker compose 命令）
+    - `stop`：停止模块（含保护基础服务）
+    - `status`：打印容器状态、端口、健康信息
+    - `clear`：清除模块所有数据（包含数据库/对象存储/索引/卷与宿主数据目录）
+- 模块级脚本目录：`scripts/modules/<module>/`
+  - `start.ps1`、`stop.ps1`、`status.ps1`、`clear-data.ps1`（供 `module.ps1` 调用）
+  - 所有脚本必须可独立运行并在失败时返回非零退出码
+  - 清理脚本须带二次确认或 `-Force` 参数
+
+注意：渲染进程不得调用 PS1；PS1 脚本用于开发/验收/CI。应用内启停仍由主进程 JS 实现。
+
+### 13.2 通用开发流程（每个模块）
+
+1) 设计阶段
+   - 在 `src/main/config/registry/` 填写模块 JSON：`name/type/dependsOn/ports/variables/healthCheck/compose` 等
+   - 明确外部依赖（如 `useExternalDB/Redis`）与默认端口
+2) 后端实现
+   - 在 `src/main/docker/template.ts` 增加模板渲染片段
+   - 在 `src/main/docker/index.ts` 扩展启停逻辑与健康等待
+   - 在 `src/shared/ipc-contract.ts` 补充必要字段
+3) 前端实现
+   - 列表项展示、端口设置表单、首次启动向导与日志入口
+4) 脚本落地
+   - 创建 `scripts/modules/<module>/start.ps1|stop.ps1|status.ps1|clear-data.ps1`
+   - 在 `scripts/module.ps1` 中注册 `<module>` 分支
+5) 联调与验收前预检
+   - 通过 `./scripts/module.ps1 -Name <module> -Action start` 启动
+   - 观察日志、健康探测；若首次启动，完成初始化/迁移
+
+### 13.3 模块验收流程（Checklist）
+
+- 配置与注册表
+  - 注册表 JSON 校验通过；依赖拓扑无环
+  - 端口默认绑定 127.0.0.1，可改为 0.0.0.0
+- 启停链路
+  - `./scripts/module.ps1 -Name <module> -Action start` 成功，健康检查通过
+  - `./scripts/module.ps1 -Name <module> -Action stop` 成功，基础服务保护生效
+  - `./scripts/module.ps1 -Name <module> -Action status` 输出正确
+- 首次启动
+  - 预检/镜像拉取/初始化/健康检查链路可观测、可重试、错误码正确
+  - `firstRunDone` 标记正确，二次启动跳过初始化
+- 清除数据（强制要求）
+  - `./scripts/module.ps1 -Name <module> -Action clear -Force` 清理容器、命名卷、宿主数据目录、数据库/索引/对象存储数据
+  - 清理后再次 `start` 能干净拉起且成功初始化
+- UI 验收
+  - 模块在列表正确展示，可进行 Start/Stop/Status/清理数据操作（清理为高级操作，需要确认）
+
+### 13.4 典型模块附加项
+
+- RagFlow：
+  - 需要 MySQL/对象存储（MinIO）与检索（ES/OS 二选一）；清理脚本应额外删除对应桶与索引
+- n8n：
+  - 生产使用 Postgres + Redis；清理脚本需删除 Postgres 数据卷与 Redis 缓存
+- OneAPI：
+  - 清理脚本需清除数据库与默认密钥（若生成），并提示用户重新配置
+- Dify：
+  - 多容器；清理需覆盖 api/web/worker 等相关卷
+
+---
+
 ## 附录A：容器与版本总览（定稿）
 
 为便于统一管理与对齐，下列为“本项目最终确认”的容器与版本清单（与“7. 版本矩阵（统一建议）”一致）：
