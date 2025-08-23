@@ -1,5 +1,5 @@
 param()
 $ErrorActionPreference = 'Stop'
 Write-Host '[mysql] status (stub)'
-# TODO: 查询 docker 容器与端口
+# TODO: query docker container and ports
 exit 0

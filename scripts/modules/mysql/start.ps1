@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Test-DockerInstalled() {
-  try { docker --version | Out-Null } catch { Write-Error '未检测到 docker，请安装 Docker Desktop'; exit 2 }
+  try { docker --version | Out-Null } catch { Write-Error 'Docker not detected. Please install Docker Desktop.'; exit 2 }
 }
 function New-DockerNetworkIfMissing($name) {
   $exists = (docker network ls --format '{{.Name}}' | Where-Object { $_ -eq $name })
@@ -34,16 +34,16 @@ New-DockerVolumeIfMissing 'ai-server-mysql-data'
 $container = 'ai-mysql'
 $running = (docker ps --filter "name=^/$container$" --format '{{.ID}}')
 if ($running) {
-  Write-Host "[mysql] 已在运行: $container"
+  Write-Host "[mysql] already running: $container"
   exit 0
 }
 
 $exists = (docker ps -a --filter "name=^/$container$" --format '{{.ID}}')
 if ($exists) {
-  Write-Host "[mysql] 启动已存在的容器: $container"
+  Write-Host "[mysql] start existing container: $container"
   docker start $container | Out-Null
 } else {
-  Write-Host "[mysql] 创建并启动容器: $container"
+  Write-Host "[mysql] create and start container: $container"
   docker run -d `
     --name $container `
     --network ai-server-net `
@@ -53,10 +53,10 @@ if ($exists) {
     mysql:8.4.6 | Out-Null
 }
 
-Write-Host "[mysql] 等待端口 ${BindAddress}:$HostPort 就绪..."
+Write-Host "[mysql] waiting for port ${BindAddress}:$HostPort ..."
 if (-not (Wait-Port $BindAddress $HostPort 40 2000)) {
-  Write-Error 'E_HEALTH_TIMEOUT: MySQL 未在预期时间内就绪'
+  Write-Error 'E_HEALTH_TIMEOUT: MySQL did not become ready within expected time.'
   exit 3
 }
-Write-Host '[mysql] 就绪'
+Write-Host '[mysql] ready'
 exit 0

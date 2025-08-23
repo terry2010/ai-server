@@ -22,10 +22,6 @@ switch ($Action) {
   'stop'  { Invoke-ModuleScript -ModuleName $Name -ScriptName 'stop' -ScriptArgs @{} }
   'status'{ Invoke-ModuleScript -ModuleName $Name -ScriptName 'status' -ScriptArgs @{} }
   'clear' {
-    if (-not $Force) {
-      $ans = Read-Host "确认清除 $Name 的所有数据？此操作不可恢复 (y/N)"
-      if ($ans -ne 'y' -and $ans -ne 'Y') { Write-Host '已取消'; exit 0 }
-    }
     $clearArgs = @{}
     if ($Force) { $clearArgs.Force = $true }
     Invoke-ModuleScript -ModuleName $Name -ScriptName 'clear-data' -ScriptArgs $clearArgs

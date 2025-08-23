@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Test-DockerInstalled {
-  try { docker --version | Out-Null } catch { Write-Error '未检测到 docker，请安装 Docker Desktop'; exit 2 }
+  try { docker --version | Out-Null } catch { Write-Error 'Docker not detected. Please install Docker Desktop.'; exit 2 }
 }
 
 function Remove-ContainerIfExists {
@@ -41,8 +41,8 @@ function Remove-NetworkIfExists {
 Test-DockerInstalled
 
 if (-not $Force) {
-  $ans = Read-Host "此操作将删除 ai-server 相关容器、卷和网络（不会删除镜像）。是否继续？(y/N)"
-  if ($ans -ne 'y' -and $ans -ne 'Y') { Write-Host '已取消'; exit 0 }
+  $ans = Read-Host "This will remove ai-server related containers, volumes and networks (images will NOT be removed). Continue? (y/N)"
+  if ($ans -ne 'y' -and $ans -ne 'Y') { Write-Host 'Canceled'; exit 0 }
 }
 
 # 停止并删除容器（不删镜像）
@@ -73,5 +73,5 @@ if ($IncludeOneApi) {
   if ($LASTEXITCODE -ne 0) { throw "oneapi start failed: $LASTEXITCODE" }
 }
 
-Write-Host 'First-run 状态模拟完成（未删除任何镜像）。'
+Write-Host 'First-run simulation completed (no images were removed).'
 exit 0
