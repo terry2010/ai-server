@@ -1,0 +1,15 @@
+{
+  "name": "minio",
+  "type": "basic",
+  "dependsOn": [],
+  "ports": [
+    { "container": 9000, "host": "${MINIO_HOST_PORT:19000}", "bind": "${BIND_ADDRESS:127.0.0.1}" },
+    { "container": 9001, "host": "${MINIO_CONSOLE_HOST_PORT:19001}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+  ],
+  "variables": {
+    "MINIO_ROOT_USER": "${MINIO_ROOT_USER:rag_flow}",
+    "MINIO_ROOT_PASSWORD": "${MINIO_ROOT_PASSWORD:infini_rag_flow}"
+  },
+  "healthCheck": { "type": "http", "target": "http://localhost:${MINIO_HOST_PORT:19000}/minio/health/live", "interval": 2000, "timeout": 20000, "retries": 30 },
+  "compose": { "templateRef": "infra" }
+}

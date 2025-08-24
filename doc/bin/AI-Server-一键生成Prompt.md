@@ -132,3 +132,8 @@ PowerShell 脚本（Win10，强制）：
 接下来你要集中精神把 dify 集成到这个项目里， 如果你对dify 有什么不清楚的， 我把最新的源码clone 到 C:\code\ai-server\doc\system-code\dify 里了，你可以随时查看
 
 你要先写出今日todo 文档并保存到 doc目录中， 然后进入开发
+
+
+
+# 你的任务
+分析项目代码，确认开发进度

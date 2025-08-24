@@ -1,0 +1,56 @@
+services:
+  dify-api:
+    image: langgenius/dify-api:1.7.2
+    container_name: ai-dify-api
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - 127.0.0.1:18091:5001
+    labels:
+      com.ai.role: feature
+      com.ai.module: dify
+      com.ai.requires: postgres,redis
+      com.ai.stack: ai-server
+    environment:
+      MIGRATION_ENABLED: 'true'
+      SECRET_KEY: please-change-me
+      DB_USERNAME: ai_server
+      DB_PASSWORD: ai_server_123
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      DB_DATABASE: ai_server
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      OPENDAL_SCHEME: fs
+      OPENDAL_FS_ROOT: /data/storage
+      CORS_ALLOW_ORIGINS: http://127.0.0.1:18090
+      WEB_API_CORS_ALLOW_ORIGINS: '*'
+      CONSOLE_CORS_ALLOW_ORIGINS: '*'
+      CONSOLE_WEB_URL: http://127.0.0.1:18090
+      WEB_API_URL: http://127.0.0.1:18091
+      APP_WEB_URL: http://127.0.0.1:18090
+    volumes:
+      - ai-dify-data:/data
+  dify-web:
+    image: langgenius/dify-web:1.7.2
+    container_name: ai-dify-web
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    labels:
+      com.ai.role: feature
+      com.ai.module: dify
+      com.ai.requires: postgres,redis
+      com.ai.stack: ai-server
+    ports:
+      - 127.0.0.1:18090:3000
+    environment:
+      DIFY_API_URL: http://ai-dify-api:5001
+      CONSOLE_API_URL: http://127.0.0.1:18091
+      NEXT_PUBLIC_CONSOLE_API_URL: http://127.0.0.1:18091
+networks:
+  ai-server-net:
+    external: true
+volumes:
+  ai-dify-data: null

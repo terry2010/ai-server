@@ -1,0 +1,14 @@
+{
+  "name": "elasticsearch",
+  "type": "basic",
+  "dependsOn": [],
+  "ports": [
+    { "container": 9200, "host": "${ES_HTTP_HOST_PORT:19200}", "bind": "${BIND_ADDRESS:127.0.0.1}" },
+    { "container": 9300, "host": "${ES_TRANSPORT_HOST_PORT:19300}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+  ],
+  "variables": {
+    "ELASTIC_PASSWORD": "${ELASTIC_PASSWORD:infini_rag_flow}"
+  },
+  "healthCheck": { "type": "tcp", "target": "localhost:${ES_HTTP_HOST_PORT:19200}", "interval": 3000, "timeout": 3000, "retries": 60 },
+  "compose": { "templateRef": "infra" }
+}

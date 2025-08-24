@@ -158,9 +158,16 @@ export function materializeFeatureCompose(name: string): TemplateResult {
   }
 
   try {
-    const tmpDir = path.join(os.tmpdir(), 'ai-server');
-    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-    const out = path.join(tmpDir, `feature-${name}.compose.yml`);
+    let outDir: string;
+    if (base.ok) {
+      // 将物化后的 compose 写到原模板同目录，保证相对卷路径按模板目录解析
+      outDir = path.dirname(base.path);
+    } else {
+      // fragment 情况：仍回退到临时目录
+      outDir = path.join(os.tmpdir(), 'ai-server');
+      if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+    }
+    const out = path.join(outDir, `feature-${name}.compose.yml`);
     const text = yaml.dump(replaced, { noRefs: true, lineWidth: 120 });
     fs.writeFileSync(out, text, 'utf-8');
     return { ok: true, path: toPosix(out) };

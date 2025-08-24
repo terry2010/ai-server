@@ -1,0 +1,38 @@
+networks:
+  ai-server-net:
+    external: true
+services:
+  ragflow:
+    image: infiniflow/ragflow:v0.20.3-slim
+    container_name: ai-ragflow
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - 127.0.0.1:18600:9380
+    environment:
+      - DOC_ENGINE=elasticsearch
+      - SVR_HTTP_PORT=9380
+      - ES_HOST=ai-elasticsearch
+      - ES_PORT=9200
+      - ELASTIC_PASSWORD=infini_rag_flow
+      - REDIS_HOST=ai-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - MYSQL_HOST=ai-mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DBNAME=rag_flow
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
+      - MINIO_HOST=ai-minio
+      - MINIO_PORT=9000
+      - MINIO_USER=rag_flow
+      - MINIO_PASSWORD=infini_rag_flow
+      - TZ=Asia/Shanghai
+    volumes:
+      - ../../../doc/system-code/ragflow/docker/service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template:ro
+    labels:
+      com.ai.role: feature
+      com.ai.module: ragflow
+      com.ai.requires: mysql,redis,minio,elasticsearch
+      com.ai.stack: ai-server

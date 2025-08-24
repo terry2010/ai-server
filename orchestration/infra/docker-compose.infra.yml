@@ -94,3 +94,56 @@ services:
       com.ai.role: "basic"
       com.ai.service: "postgres"
       com.ai.stack: "ai-server"
+
+  minio:
+    image: minio/minio:latest
+    container_name: ai-minio
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-rag_flow}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-infini_rag_flow}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MINIO_HOST_PORT:-19000}:9000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_HOST_PORT:-19001}:9001"
+    volumes:
+      - ai-server-minio-data:/data
+      - ai-server-logs:/var/log/minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    labels:
+      com.ai.role: "basic"
+      com.ai.service: "minio"
+      com.ai.stack: "ai-server"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: ai-elasticsearch
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-infini_rag_flow}
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${ES_HTTP_HOST_PORT:-19200}:9200"
+      - "${BIND_ADDRESS:-127.0.0.1}:${ES_TRANSPORT_HOST_PORT:-19300}:9300"
+    volumes:
+      - ai-server-es-data:/usr/share/elasticsearch/data
+      - ai-server-logs:/var/log/elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -k -u elastic:${ELASTIC_PASSWORD:-infini_rag_flow} https://localhost:9200 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+    labels:
+      com.ai.role: "basic"
+      com.ai.service: "elasticsearch"
+      com.ai.stack: "ai-server"

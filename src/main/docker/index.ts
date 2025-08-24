@@ -144,8 +144,10 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
       const depItem = modules.find(m => m.name === dep);
       if (!depItem) continue;
       const hc = (depItem as any).healthCheck;
+      try { emitStdout(sender, streamId, `[debug] wait health for dep=${dep} target=${String(hc?.target || '')}`); } catch {}
       const ok = await waitHealth(hc);
       if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `依赖未就绪: ${dep}` };
+      try { emitStdout(sender, streamId, `[debug] dep ready: ${dep}`); } catch {}
     }
   }
 
@@ -358,6 +360,7 @@ async function listAllContainerNames(): Promise<Set<string>> {
 
 // ===== 实时日志流版本 =====
 export async function startModuleStream(name: ModuleName, sender: WebContents, streamId: string): Promise<IpcResponse> {
+  emitStdout(sender, streamId, `[debug] enter startModuleStream name=${name}`);
   // 确保外部网络与命名卷存在（幂等）
   await ensureExternalInfraResources();
   const compose = await pickComposeCommand();
@@ -383,6 +386,7 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
       const { bind, hostPort, modName } = r as any;
       return { success: false, code: 'E_PORT_CONFLICT', message: `端口已被占用: ${bind}:${hostPort}（模块: ${modName}）。请在设置中修改宿主机端口或释放后重试。` };
     }
+    emitStdout(sender, streamId, `[debug] port check passed for ${name}`);
   }
 
   // 启动依赖
@@ -391,33 +395,47 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
     const runningSet = await listRunningContainerNames();
     const allSet = await listAllContainerNames();
     const needUp: string[] = [];
+    try { emitStdout(sender, streamId, `[debug] deps count=${deps.length} runningSet=${runningSet.size} allSet=${allSet.size}`); } catch {}
     for (const dep of deps) {
       const cname = containerNameFor(dep);
-      if (runningSet.has(cname)) continue;
+      if (runningSet.has(cname)) {
+        try { emitStdout(sender, streamId, `[debug] dep already running: ${dep} (${cname})`); } catch {}
+        continue;
+      }
       if (allSet.has(cname)) {
+        try { emitStdout(sender, streamId, `[debug] docker start ${cname}`); } catch {}
         await spawnStream(`docker start ${cname}`, sender, streamId);
       } else {
-        needUp.push(serviceNameFor(dep));
+        const svc = serviceNameFor(dep);
+        needUp.push(svc);
+        try { emitStdout(sender, streamId, `[debug] enqueue compose up for dep: ${dep} service=${svc}`); } catch {}
       }
     }
     if (needUp.length > 0) {
+      try { emitStdout(sender, streamId, `[debug] compose up infra needUp=[${needUp.join(', ')}]`); } catch {}
       const r = await composeUpStream(infraCompose, needUp, sender, streamId);
+      try { emitStdout(sender, streamId, `[debug] compose up infra done ok=${r.ok}`); } catch {}
       if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动依赖失败' };
     }
     for (const dep of deps) {
       const depItem = modules.find(m => m.name === dep);
       if (!depItem) continue;
       const hc = (depItem as any).healthCheck;
+      try { emitStdout(sender, streamId, `[debug] wait health for dep=${dep} target=${String(hc?.target || '')}`); } catch {}
       const ok = await waitHealth(hc);
       if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `依赖未就绪: ${dep}` };
+      try { emitStdout(sender, streamId, `[debug] dep ready: ${dep}`); } catch {}
     }
+    emitStdout(sender, streamId, `[debug] deps ready for ${name}`);
   }
 
   // 启动自身
   if (target.type === 'feature') {
+    emitStdout(sender, streamId, `[debug] materialize feature compose for ${name}`);
     const tpl = materializeFeatureCompose(name);
     if (!tpl.ok) return { success: false, code: (tpl as any).code, message: (tpl as any).message };
     const featureCompose = (tpl as any).path;
+    emitStdout(sender, streamId, `[debug] feature compose path: ${featureCompose}`);
     const r = await composeUpStream(featureCompose, servicesForModule(name), sender, streamId);
     if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动模块失败' };
   } else {
@@ -435,7 +453,9 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
       if (!r.ok) return { success: false, code: r.code as any, message: r.message || '启动模块失败' };
     }
   }
+  emitStdout(sender, streamId, `[debug] wait health for ${name}`);
   const ok = await waitHealth((target as any).healthCheck);
+  emitStdout(sender, streamId, `[debug] health result for ${name}: ${ok}`);
   if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `模块未就绪: ${name}` };
   return { success: true, message: `start ${name} OK` };
 }

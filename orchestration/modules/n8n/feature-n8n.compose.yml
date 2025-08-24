@@ -1,0 +1,28 @@
+networks:
+  ai-server-net:
+    external: true
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ai-n8n
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - 127.0.0.1:18100:5678
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=ai-postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=ai_server
+      - DB_POSTGRESDB_USER=ai_server
+      - DB_POSTGRESDB_PASSWORD=ai_server_123
+      - QUEUE_BULL_REDIS_HOST=ai-redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+    labels:
+      com.ai.role: feature
+      com.ai.module: n8n
+      com.ai.requires: postgres,redis
+      com.ai.stack: ai-server

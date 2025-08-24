@@ -1,0 +1,52 @@
+# RagFlow feature compose
+# 依赖外部网络 ai-server-net 与基础服务 postgres/redis
+
+networks:
+  ai-server-net:
+    external: true
+
+services:
+  ragflow:
+    image: infiniflow/ragflow:v0.20.3-slim
+    container_name: ai-ragflow
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${RAGFLOW_PORT:-18600}:9380"
+    environment:
+      # 文档引擎
+      - DOC_ENGINE=${DOC_ENGINE:-elasticsearch}
+      # 后端 HTTP 端口（容器内固定为 9380）
+      - SVR_HTTP_PORT=9380
+      # Elasticsearch
+      - ES_HOST=${ES_HOST:-ai-elasticsearch}
+      - ES_PORT=${ES_PORT:-9200}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-infini_rag_flow}
+      # Redis（infra 未启用密码，显式禁用 AUTH）
+      - REDIS_HOST=${RAGFLOW_REDIS_HOST:-ai-redis}
+      - REDIS_PORT=${RAGFLOW_REDIS_PORT:-6379}
+      - REDIS_PASSWORD=
+      # MySQL（使用 infra 的 root/root）
+      - MYSQL_HOST=${MYSQL_HOST:-ai-mysql}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DBNAME=${MYSQL_DBNAME:-rag_flow}
+      - MYSQL_USER=${MYSQL_USER:-root}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-root}
+      # MinIO
+      - MINIO_HOST=${MINIO_HOST:-ai-minio}
+      - MINIO_PORT=${MINIO_PORT:-9000}
+      - MINIO_USER=${MINIO_USER:-rag_flow}
+      - MINIO_PASSWORD=${MINIO_PASSWORD:-infini_rag_flow}
+      # 时区
+      - TZ=${TIMEZONE:-Asia/Shanghai}
+    volumes:
+      # 重要：不要覆盖 /ragflow/conf/service_conf.yaml（entrypoint 会尝试删除/重建该文件）。
+      # 仅将模板挂载为 service_conf.yaml.template，容器自身会基于该模板生成最终的 service_conf.yaml。
+      # 相对路径基于本 compose 文件。
+      - "../../../doc/system-code/ragflow/docker/service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template:ro"
+    labels:
+      com.ai.role: "feature"
+      com.ai.module: "ragflow"
+      com.ai.requires: "mysql,redis,minio,elasticsearch"
+      com.ai.stack: "ai-server"

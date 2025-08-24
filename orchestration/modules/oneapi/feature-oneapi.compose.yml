@@ -1,0 +1,20 @@
+networks:
+  ai-server-net:
+    external: true
+services:
+  oneapi:
+    image: justsong/one-api:v0.6.11-preview.7
+    container_name: ai-oneapi
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - 127.0.0.1:18000:3000
+    environment:
+      - SQL_DSN=oneapi:oneapi_pwd@tcp(ai-mysql:3306)/oneapi?charset=utf8mb4&parseTime=True&loc=Local
+      - REDIS_CONN=redis://ai-redis:6379/0
+    labels:
+      com.ai.role: feature
+      com.ai.module: oneapi
+      com.ai.requires: mysql,redis
+      com.ai.stack: ai-server
