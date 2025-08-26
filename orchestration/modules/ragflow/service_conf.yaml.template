@@ -1,0 +1,41 @@
+ragflow:
+  host: ${RAGFLOW_HOST:-127.0.0.1}
+  http_port: 9381
+mysql:
+  name: '${MYSQL_DBNAME:-rag_flow}'
+  user: '${MYSQL_USER:-root}'
+  password: '${MYSQL_PASSWORD:-root}'
+  host: '${MYSQL_HOST:-mysql}'
+  port: 3306
+  max_connections: 900
+  stale_timeout: 300
+  max_allowed_packet: ${MYSQL_MAX_PACKET:-1073741824}
+minio:
+  user: '${MINIO_USER:-rag_flow}'
+  password: '${MINIO_PASSWORD:-infini_rag_flow}'
+  host: '${MINIO_HOST:-minio}'
+  port: ${MINIO_PORT:-9000}
+es:
+  hosts: 'http://${ES_HOST:-es01}:9200'
+  username: '${ES_USER:-elastic}'
+  password: '${ELASTIC_PASSWORD:-infini_rag_flow}'
+os:
+  hosts: 'http://${OS_HOST:-opensearch01}:9201'
+  username: '${OS_USER:-admin}'
+  password: '${OPENSEARCH_PASSWORD:-infini_rag_flow_OS_01}'
+infinity:
+  uri: '${INFINITY_HOST:-infinity}:23817'
+  db_name: 'default_db'
+redis:
+  db: 1
+  password: '${REDIS_PASSWORD:-}' # 空密码以支持无密码Redis
+  host: '${REDIS_HOST:-redis}:${REDIS_PORT:-6379}'
+
+# postgres:
+#   name: '${POSTGRES_DBNAME:-rag_flow}'
+#   user: '${POSTGRES_USER:-rag_flow}'
+#   password: '${POSTGRES_PASSWORD:-infini_rag_flow}'
+#   host: '${POSTGRES_HOST:-postgres}'
+#   port: 5432
+#   max_connections: 100
+#   stale_timeout: 30

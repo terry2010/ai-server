@@ -12,13 +12,14 @@ services:
       - 127.0.0.1:18600:9380
     environment:
       - DOC_ENGINE=elasticsearch
-      - SVR_HTTP_PORT=9380
+      - SVR_HTTP_PORT=9381
       - ES_HOST=ai-elasticsearch
       - ES_PORT=9200
       - ELASTIC_PASSWORD=infini_rag_flow
       - REDIS_HOST=ai-redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=
+      - REDIS_DB=1
       - MYSQL_HOST=ai-mysql
       - MYSQL_PORT=3306
       - MYSQL_DBNAME=rag_flow
@@ -30,9 +31,36 @@ services:
       - MINIO_PASSWORD=infini_rag_flow
       - TZ=Asia/Shanghai
     volumes:
-      - ../../../doc/system-code/ragflow/docker/service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template:ro
+      - ./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template:ro
+      - ./nginx-ragflow.conf:/etc/nginx/sites-available/ragflow:ro
+      - ./custom-entrypoint.sh:/custom-entrypoint.sh:ro
+    entrypoint:
+      - /bin/bash
+      - /custom-entrypoint.sh
+    depends_on:
+      mysql-init:
+        condition: service_completed_successfully
     labels:
       com.ai.role: feature
       com.ai.module: ragflow
       com.ai.requires: mysql,redis,minio,elasticsearch
       com.ai.stack: ai-server
+  mysql-init:
+    image: mysql:8.0.36
+    container_name: ai-ragflow-mysql-init
+    networks:
+      - ai-server-net
+    environment:
+      - MYSQL_HOST=ai-mysql
+      - MYSQL_ROOT_PASSWORD=root
+    command: |
+      bash -c "
+        echo 'Waiting for MySQL to be ready...'
+        until mysql -hai-mysql -uroot -proot -e 'SELECT 1' > /dev/null 2>&1; do
+          sleep 2
+        done
+        echo 'Creating rag_flow database if not exists...'
+        mysql -hai-mysql -uroot -proot -e 'CREATE DATABASE IF NOT EXISTS rag_flow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+        echo 'Database initialization completed.'
+      "
+    restart: 'no'

@@ -35,8 +35,19 @@ function Remove-VolumeIfExists {
   param([string]$Name)
   $exists = docker volume ls --format '{{.Name}}' | Where-Object { $_ -eq $Name }
   if ($exists) {
-    docker volume rm $Name | Out-Null
-    Write-Host "removed volume: $Name"
+    try {
+      docker volume rm $Name | Out-Null
+      Write-Host "removed volume: $Name"
+    } catch {
+      Write-Warning "Volume $Name is in use, retrying..."
+      Start-Sleep -Seconds 2
+      try {
+        docker volume rm $Name | Out-Null
+        Write-Host "removed volume: $Name (retry successful)"
+      } catch {
+        Write-Warning "Failed to remove volume $Name after retry"
+      }
+    }
   }
 }
 
@@ -60,9 +71,12 @@ if (-not $Force) {
 Stop-ContainerByName -Name 'ai-mysql'
 Stop-ContainerByName -Name 'ai-redis'
 Stop-ContainerByName -Name 'ai-postgres'
-if ($IncludeModules) {
-  Remove-ContainersByPrefix -Prefix 'ai-'
-}
+# Always remove all ai-* containers (including modules)
+Remove-ContainersByPrefix -Prefix 'ai-'
+
+# Wait for Docker to release resources
+Write-Host "Waiting for Docker to release resources..."
+Start-Sleep -Seconds 3
 
 # 2) remove named volumes (aligned with infra compose)
 $volumes = @(

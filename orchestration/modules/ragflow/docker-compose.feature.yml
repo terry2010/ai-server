@@ -17,8 +17,8 @@ services:
     environment:
       # 文档引擎
       - DOC_ENGINE=${DOC_ENGINE:-elasticsearch}
-      # 后端 HTTP 端口（容器内固定为 9380）
-      - SVR_HTTP_PORT=9380
+      # 后端 HTTP 端口（Flask服务在9381，nginx在9380）
+      - SVR_HTTP_PORT=9381
       # Elasticsearch
       - ES_HOST=${ES_HOST:-ai-elasticsearch}
       - ES_PORT=${ES_PORT:-9200}
@@ -27,6 +27,7 @@ services:
       - REDIS_HOST=${RAGFLOW_REDIS_HOST:-ai-redis}
       - REDIS_PORT=${RAGFLOW_REDIS_PORT:-6379}
       - REDIS_PASSWORD=
+      - REDIS_DB=1
       # MySQL（使用 infra 的 root/root）
       - MYSQL_HOST=${MYSQL_HOST:-ai-mysql}
       - MYSQL_PORT=${MYSQL_PORT:-3306}
@@ -43,10 +44,39 @@ services:
     volumes:
       # 重要：不要覆盖 /ragflow/conf/service_conf.yaml（entrypoint 会尝试删除/重建该文件）。
       # 仅将模板挂载为 service_conf.yaml.template，容器自身会基于该模板生成最终的 service_conf.yaml。
-      # 相对路径基于本 compose 文件。
-      - "../../../doc/system-code/ragflow/docker/service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template:ro"
+      # 使用修正的配置模板解决Redis密码问题
+      - "./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template:ro"
+      # 挂载nginx配置文件
+      - "./nginx-ragflow.conf:/etc/nginx/sites-available/ragflow:ro"
+      # 挂载自定义entrypoint脚本
+      - "./custom-entrypoint.sh:/custom-entrypoint.sh:ro"
+    entrypoint: ["/bin/bash", "/custom-entrypoint.sh"]
+    depends_on:
+      mysql-init:
+        condition: service_completed_successfully
     labels:
       com.ai.role: "feature"
       com.ai.module: "ragflow"
       com.ai.requires: "mysql,redis,minio,elasticsearch"
       com.ai.stack: "ai-server"
+
+  # MySQL数据库初始化服务
+  mysql-init:
+    image: mysql:8.0.36
+    container_name: ai-ragflow-mysql-init
+    networks:
+      - ai-server-net
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST:-ai-mysql}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD:-root}
+    command: >
+      bash -c "
+        echo 'Waiting for MySQL to be ready...'
+        until mysql -h${MYSQL_HOST:-ai-mysql} -uroot -p${MYSQL_ROOT_PASSWORD:-root} -e 'SELECT 1' > /dev/null 2>&1; do
+          sleep 2
+        done
+        echo 'Creating rag_flow database if not exists...'
+        mysql -h${MYSQL_HOST:-ai-mysql} -uroot -p${MYSQL_ROOT_PASSWORD:-root} -e 'CREATE DATABASE IF NOT EXISTS rag_flow CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+        echo 'Database initialization completed.'
+      "
+    restart: "no"
