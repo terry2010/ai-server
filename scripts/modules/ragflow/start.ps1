@@ -56,14 +56,14 @@ function Test-ServiceHealth($serviceName, $hostAddress, $port, $protocol = 'tcp'
 Test-DockerInstalled
 New-DockerNetworkIfMissing 'ai-server-net'
 
-# 计算 compose 路径
+# Calculate compose path
 $ThisScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $composeRel = '..\\..\\..\\orchestration\\modules\\ragflow\\docker-compose.feature.yml'
 $composePath = Join-Path -Path $ThisScriptRoot -ChildPath $composeRel
 if (-not (Test-Path $composePath)) { Write-Error "E_TEMPLATE_MISSING: compose not found at $composePath"; exit 4 }
 try { $composePath = (Resolve-Path $composePath).Path } catch {}
 
-# 检查依赖服务健康状态
+# Check dependency services health status
 Write-Host '[ragflow] checking dependencies...'
 $dependencies = @(
   @{ name = 'MySQL'; hostAddress = $MySQLHost; port = $MySQLPort },
@@ -88,13 +88,13 @@ if ($unhealthy.Count -gt 0) {
   Write-Host "Consider starting infrastructure services first (MySQL, Redis, MinIO, Elasticsearch)"
 }
 
-# 设置环境变量
+# Set environment variables
 $env:BIND_ADDRESS = $BindAddress
 $env:RAGFLOW_PORT = [string]$HostPort
 $env:DOC_ENGINE = $DocEngine
 
-# 依赖服务连接配置
-$env:MYSQL_HOST = "ai-mysql"  # 使用容器网络内的服务名
+# Dependency service connection configuration
+$env:MYSQL_HOST = "ai-mysql"  # Use service name within container network
 $env:MYSQL_PORT = "3306"
 $env:MYSQL_USER = $MySQLUser
 $env:MYSQL_PASSWORD = $MySQLPass
@@ -114,12 +114,12 @@ $env:ELASTIC_PASSWORD = "infini_rag_flow"
 
 $env:TIMEZONE = "Asia/Shanghai"
 
-# 启动 RagFlow 服务（包括 mysql-init 和 ragflow）
+# Start RagFlow services (including mysql-init and ragflow)
 Write-Host '[ragflow] starting via docker compose (mysql-init + ragflow)'
 docker compose -f $composePath up -d --no-recreate mysql-init ragflow
 if ($LASTEXITCODE -ne 0) { Write-Error 'E_RUNTIME: docker compose up failed'; exit 5 }
 
-# 等待服务就绪
+# Wait for service to be ready
 $healthUrl = "http://${BindAddress}:${HostPort}/"
 Write-Host "[ragflow] waiting for http: $healthUrl ..."
 if (-not (Wait-Http $healthUrl 60 3000)) {

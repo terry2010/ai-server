@@ -35,19 +35,19 @@ function Wait-Http($url, $retries = 30, $sleepMs = 2000) {
 Test-DockerInstalled
 New-DockerNetworkIfMissing 'ai-server-net'
 
-# 计算 compose 路径（相对仓库根目录），兼容 $PSScriptRoot 为空
+# Calculate compose path (relative to repo root), compatible with empty $PSScriptRoot
 $ThisScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $composeRel = '..\\..\\..\\orchestration\\modules\\dify\\docker-compose.feature.yml'
 $composePath = Join-Path -Path $ThisScriptRoot -ChildPath $composeRel
 if (-not (Test-Path $composePath)) { Write-Error "E_TEMPLATE_MISSING: compose not found at $composePath"; exit 4 }
 try { $composePath = (Resolve-Path $composePath).Path } catch {}
 
-# 设置供 compose 解析的环境变量
+# Set environment variables for compose to parse
 $env:BIND_ADDRESS = $BindAddress
 $env:DIFY_WEB_PORT = [string]$HostPort
 $env:DIFY_API_PORT = [string]$ApiPort
 
-# 兼容旧参数（若仍通过本机端口连外部服务，可继续使用这些变量）
+# Compatible with old parameters (if still connecting to external services via local ports)
 $env:DIFY_DB_HOST = $DbHost
 $env:DIFY_DB_PORT = [string]$DbPort
 $env:DIFY_DB_USER = $DbUser
@@ -56,16 +56,16 @@ $env:DIFY_DB_NAME = $DbName
 $env:DIFY_REDIS_HOST = $RedisHost
 $env:DIFY_REDIS_PORT = [string]$RedisPort
 
-# 启用 API 侧数据库迁移（默认启用）
+# Enable API-side database migration (enabled by default)
 if ($EnableMigration -or $true) {
   if (-not $env:DIFY_SECRET_KEY) { $env:DIFY_SECRET_KEY = 'please-change-me' }
   $env:MIGRATION_ENABLED = 'true'
-  Write-Host '[dify] MIGRATION_ENABLED=true (Alembic 将在 api 启动时自动迁移)'
+  Write-Host '[dify] MIGRATION_ENABLED=true (Alembic will automatically migrate when api starts)'
 }
 
-# 幂等启动（不重建）
-Write-Host '[dify] starting via docker compose (api/web/plugin-daemon)'
-docker compose -f $composePath up -d --no-recreate dify-api dify-web dify-plugin-daemon
+# Idempotent startup (no recreation)
+Write-Host '[dify] starting via docker compose (api/web/plugin-daemon/qdrant)'
+docker compose -f $composePath up -d --no-recreate qdrant dify-api dify-web dify-plugin-daemon
 if ($LASTEXITCODE -ne 0) { Write-Error 'E_RUNTIME: docker compose up failed'; exit 5 }
 
 $healthUrl = "http://${BindAddress}:${HostPort}/"

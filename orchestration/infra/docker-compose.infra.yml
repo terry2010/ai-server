@@ -16,6 +16,7 @@ volumes:
     external: true
   ai-server-postgres-data:
     external: true
+  ai-server-qdrant-data:
   ai-server-logs:
     external: true
 
@@ -147,4 +148,28 @@ services:
     labels:
       com.ai.role: "basic"
       com.ai.service: "elasticsearch"
+      com.ai.stack: "ai-server"
+
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: ai-qdrant
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${QDRANT_HOST_PORT:-16333}:6333"
+    volumes:
+      - ai-server-qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "cat", "/proc/1/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    labels:
+      com.ai.role: "basic"
+      com.ai.service: "qdrant"
       com.ai.stack: "ai-server"

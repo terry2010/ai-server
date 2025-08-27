@@ -67,7 +67,7 @@ if (-not $Force) {
   if ($ans -ne 'y' -and $ans -ne 'Y') { Write-Host 'Canceled'; exit 0 }
 }
 
-# 1) stop and remove containers
+# 1) Stop and remove containers
 Stop-ContainerByName -Name 'ai-mysql'
 Stop-ContainerByName -Name 'ai-redis'
 Stop-ContainerByName -Name 'ai-postgres'
@@ -78,7 +78,7 @@ Remove-ContainersByPrefix -Prefix 'ai-'
 Write-Host "Waiting for Docker to release resources..."
 Start-Sleep -Seconds 3
 
-# 2) remove named volumes (aligned with infra compose)
+# 2) Remove named volumes (aligned with infra compose)
 $volumes = @(
   'ai-server-mysql-data',
   'ai-server-redis-data',
@@ -89,7 +89,7 @@ $volumes = @(
 )
 foreach ($v in $volumes) { Remove-VolumeIfExists -Name $v }
 
-# 3) remove external network
+# 3) Remove external network
 Remove-NetworkIfExists -Name 'ai-server-net'
 
 Write-Host 'Cleanup completed: containers/volumes/network removed. The host is now in a simulated first-run state.'

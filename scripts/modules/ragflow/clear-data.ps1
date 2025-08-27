@@ -57,7 +57,7 @@ if (-not (Confirm-Action 'This will stop and remove RagFlow containers and relat
 
 Write-Host "=== Cleaning RagFlow ===" -ForegroundColor Yellow
 
-# 优先使用 compose down
+# Prefer using compose down
 $composePath = Join-Path $PSScriptRoot '..\\..\\..\\orchestration\\modules\\ragflow\\docker-compose.feature.yml' | Resolve-Path -ErrorAction SilentlyContinue
 if ($composePath -and (Test-Path $composePath)) {
   Write-Host '[ragflow] docker compose down -v (ragflow + mysql-init)'
@@ -71,17 +71,17 @@ if ($composePath -and (Test-Path $composePath)) {
   Write-Warning "Compose file not found, performing manual cleanup"
 }
 
-# 手动清理容器（兜底）
+# Manual container cleanup (fallback)
 $containers = @('ai-ragflow', 'ai-ragflow-mysql-init')
 foreach ($container in $containers) {
   Remove-ContainerIfExists $container | Out-Null
 }
 
-# 清理可能的相关数据卷（谨慎操作）
+# Clean up possible related data volumes (use with caution)
 Write-Host ""
 Write-Host "=== Checking for RagFlow-specific volumes ===" -ForegroundColor Cyan
 
-# 检查是否有 RagFlow 专用的数据卷
+# Check for RagFlow-specific volumes
 $ragflowVolumes = docker volume ls --format '{{.Name}}' | Where-Object { $_ -like '*ragflow*' -or $_ -like '*rag-flow*' }
 if ($ragflowVolumes) {
   Write-Host "Found potential RagFlow volumes:"
@@ -98,7 +98,7 @@ if ($ragflowVolumes) {
   Write-Host "No RagFlow-specific volumes found"
 }
 
-# 注意：不要清理共享的基础设施卷（如 ai-server-mysql-data）
+# Note: Do not clean shared infrastructure volumes (like ai-server-mysql-data)
 Write-Host ""
 Write-Host "Note: Shared infrastructure volumes (mysql, redis, etc.) are preserved" -ForegroundColor Green
 Write-Host "Use reset-first-run.ps1 to clean all infrastructure if needed" -ForegroundColor Gray

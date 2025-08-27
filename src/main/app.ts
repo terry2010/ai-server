@@ -13,6 +13,9 @@ const electronModule = require('electron');
 console.log('[main] electron keys =', Object.keys(electronModule));
 const app = electronModule.app;
 const BrowserWindow = electronModule.BrowserWindow;
+// 重置注册表缓存，确保新模块能被加载
+import { resetRegistryCache } from './config/store';
+resetRegistryCache();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const path = require('node:path');
 

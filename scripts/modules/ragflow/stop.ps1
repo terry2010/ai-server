@@ -6,7 +6,7 @@ function Test-DockerInstalled() {
 
 Test-DockerInstalled
 
-# 优先使用 compose 停止服务
+# Prefer using compose to stop services
 $ThisScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $composeRel = '..\\..\\..\\orchestration\\modules\\ragflow\\docker-compose.feature.yml'
 $composePath = Join-Path -Path $ThisScriptRoot -ChildPath $composeRel
@@ -17,7 +17,7 @@ if ($composePath -and (Test-Path $composePath)) {
   docker compose -f $composePath stop ragflow mysql-init
   if ($LASTEXITCODE -ne 0) { Write-Error 'E_RUNTIME: docker compose stop failed'; exit 3 }
 } else {
-  # 兼容旧路径：直接停止容器
+  # Fallback: directly stop containers for compatibility
   foreach ($c in @('ai-ragflow','ai-ragflow-mysql-init')) {
     $running = (docker ps --filter "name=^/$c$" --format '{{.ID}}')
     if ($running) {

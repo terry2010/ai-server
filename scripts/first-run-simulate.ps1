@@ -45,19 +45,19 @@ if (-not $Force) {
   if ($ans -ne 'y' -and $ans -ne 'Y') { Write-Host 'Canceled'; exit 0 }
 }
 
-# 停止并删除容器（不删镜像）
+# Stop and remove containers (images will NOT be removed)
 Remove-ContainerIfExists -Name 'ai-mysql'
 Remove-ContainerIfExists -Name 'ai-redis'
 if ($IncludeOneApi) { Remove-ContainerIfExists -Name 'ai-oneapi' }
 
-# 删除命名卷
+# Remove named volumes
 Remove-VolumeIfExists -Name 'ai-server-mysql-data'
 Remove-VolumeIfExists -Name 'ai-server-redis-data'
 
-# 删除网络
+# Remove networks
 Remove-NetworkIfExists -Name 'ai-server-net'
 
-# 重新启动基础服务
+# Restart basic services
 $module = Join-Path $PSScriptRoot 'module.ps1'
 Write-Host '=== Start MySQL ==='
 & $module -Name mysql -Action start

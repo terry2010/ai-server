@@ -32,8 +32,9 @@ export async function waitHealth(hc: any): Promise<boolean> {
   return true;
 }
 
-// 与 index.ts 中保持一致：解析 ${VAR:default}
+// 与 template.ts 中保持一致：解析 ${VAR:default} 和 ${VAR:-default}
 function resolveVarsInString(s?: string): string | undefined {
   if (!s) return s;
-  return s.replace(/\$\{[^:}]+:([^}]+)}/g, (_all, dflt) => String(dflt));
+  // 将 ${VAR:-default} 或 ${VAR:default} 用默认值替换
+  return s.replace(/\$\{[^:}]+:-?([^}]+)}/g, (_all, dflt) => String(dflt));
 }

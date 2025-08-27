@@ -36,7 +36,7 @@ Test-DockerInstalled
 
 Write-Host "=== RagFlow Status ===" -ForegroundColor Cyan
 
-# 检查 compose 文件状态
+# Check compose file status
 $composePath = Join-Path $PSScriptRoot '..\\..\\..\\orchestration\\modules\\ragflow\\docker-compose.feature.yml' | Resolve-Path -ErrorAction SilentlyContinue
 if ($composePath -and (Test-Path $composePath)) {
   Write-Host '[ragflow] status via docker compose'
@@ -46,7 +46,7 @@ if ($composePath -and (Test-Path $composePath)) {
   Write-Warning "Compose file not found, checking containers directly"
 }
 
-# 检查主要容器状态
+# Check main container status
 $containers = @('ai-ragflow', 'ai-ragflow-mysql-init')
 foreach ($container in $containers) {
   $status = Get-ContainerStatus $container
@@ -67,7 +67,7 @@ foreach ($container in $containers) {
 
 Write-Host ""
 
-# 检查网络连接
+# Check network connection
 $networkExists = (docker network ls --format '{{.Name}}' | Where-Object { $_ -eq 'ai-server-net' })
 if ($networkExists) {
   Write-Host "[ragflow] network: ai-server-net exists" -ForegroundColor Green
@@ -75,7 +75,7 @@ if ($networkExists) {
   Write-Host "[ragflow] network: ai-server-net missing" -ForegroundColor Red
 }
 
-# HTTP 健康检查
+# HTTP health check
 $healthUrl = "http://${BindAddress}:${HostPort}/"
 $httpOk = Test-HttpOk $healthUrl
 $httpStatus = if ($httpOk) { 'OK' } else { 'FAIL' }
@@ -83,7 +83,7 @@ $httpColor = if ($httpOk) { 'Green' } else { 'Red' }
 
 Write-Host ("[ragflow] http check {0}: {1}" -f $healthUrl, $httpStatus) -ForegroundColor $httpColor
 
-# 检查依赖服务状态
+# Check dependency services status
 Write-Host ""
 Write-Host "=== Dependencies Status ===" -ForegroundColor Cyan
 $dependencies = @('ai-mysql', 'ai-redis', 'ai-minio', 'ai-elasticsearch')
@@ -93,7 +93,7 @@ foreach ($dep in $dependencies) {
   Write-Host ("[ragflow] dependency {0}: {1}" -f $dep, $depStatus) -ForegroundColor $depColor
 }
 
-# 最终状态总结
+# Final status summary
 Write-Host ""
 if ($httpOk) {
   Write-Host "✓ RagFlow is ready and accessible" -ForegroundColor Green

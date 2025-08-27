@@ -4,18 +4,18 @@ function Test-DockerInstalled() { try { docker --version | Out-Null } catch { Wr
 
 Test-DockerInstalled
 
-# 优先使用 compose 停止两个服务
+# Prefer using compose to stop services
 $ThisScriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $composeRel = '..\\..\\..\\orchestration\\modules\\dify\\docker-compose.feature.yml'
 $composePath = Join-Path -Path $ThisScriptRoot -ChildPath $composeRel
 try { $composePath = (Resolve-Path -ErrorAction SilentlyContinue $composePath).Path } catch {}
 if ($composePath -and (Test-Path $composePath)) {
-  Write-Host '[dify] stopping via docker compose (web/api/plugin-daemon)'
-  docker compose -f $composePath stop dify-web dify-api dify-plugin-daemon
+  Write-Host '[dify] stopping via docker compose (web/api/plugin-daemon/qdrant)'
+  docker compose -f $composePath stop dify-web dify-api dify-plugin-daemon qdrant
   if ($LASTEXITCODE -ne 0) { Write-Error 'E_RUNTIME: docker compose stop failed'; exit 3 }
 } else {
-  # 兼容旧路径：直接停止容器
-  foreach ($c in @('ai-dify-web','ai-dify-api','ai-dify-plugin-daemon')) {
+  # Fallback: directly stop containers for compatibility
+  foreach ($c in @('ai-dify-web','ai-dify-api','ai-dify-plugin-daemon','ai-qdrant')) {
     $running = (docker ps --filter "name=^/$c$" --format '{{.ID}}')
     if ($running) {
       Write-Host "[dify] stopping container: $c"

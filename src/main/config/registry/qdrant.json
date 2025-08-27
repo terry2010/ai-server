@@ -1,0 +1,37 @@
+{
+  "name": "qdrant",
+  "displayName": "Qdrant",
+  "description": "Vector database service for storing and retrieving vector data",
+  "category": "basic",
+  "type": "basic",
+  "version": "v1.7.4",
+  "image": "qdrant/qdrant:v1.7.4",
+  "containerName": "ai-qdrant",
+  "dependencies": [],
+  "ports": [
+    {
+      "name": "http",
+      "containerPort": 6333,
+      "hostPort": "${QDRANT_HOST_PORT:-16333}",
+      "protocol": "tcp",
+      "description": "Qdrant HTTP API Port"
+    },
+    {
+      "name": "grpc", 
+      "containerPort": 6334,
+      "hostPort": "${QDRANT_GRPC_PORT:-16334}",
+      "protocol": "tcp",
+      "description": "Qdrant gRPC API Port"
+    }
+  ],
+  "healthCheck": {
+    "type": "tcp",
+    "target": "localhost:${QDRANT_HOST_PORT:-16333}",
+    "timeout": 5000,
+    "retries": 12
+  },
+  "compose": {
+    "templateRef": "infra",
+    "serviceName": "qdrant"
+  }
+}

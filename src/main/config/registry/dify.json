@@ -1,7 +1,7 @@
 {
   "name": "dify",
   "type": "feature",
-  "dependsOn": ["postgres", "redis"],
+  "dependsOn": ["postgres", "redis", "qdrant"],
   "ports": [
     { "container": 3000, "host": "${DIFY_WEB_PORT:18090}", "bind": "${BIND_ADDRESS:127.0.0.1}" },
     { "container": 5001, "host": "${DIFY_API_PORT:18091}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
@@ -13,7 +13,8 @@
     "DIFY_SECRET_KEY": "${DIFY_SECRET_KEY:please-change-me}",
     "DIFY_PLUGIN_INNER_API_KEY": "${DIFY_PLUGIN_INNER_API_KEY:QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}",
     "DIFY_PLUGIN_DAEMON_KEY": "${DIFY_PLUGIN_DAEMON_KEY:lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}",
-    "DIFY_PLUGIN_DB": "${DIFY_PLUGIN_DB:ai_server_plugin}"
+    "DIFY_PLUGIN_DB": "${DIFY_PLUGIN_DB:ai_server_plugin}",
+    "QDRANT_PORT": "${QDRANT_PORT:16333}"
   },
   "healthCheck": { "type": "http", "target": "http://localhost:${DIFY_WEB_PORT:18090}/", "interval": 2000, "timeout": 20000, "retries": 30 },
   "compose": { "templateRef": "docker-compose.feature.yml" }
