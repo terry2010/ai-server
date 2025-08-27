@@ -64,8 +64,8 @@ if ($EnableMigration -or $true) {
 }
 
 # 幂等启动（不重建）
-Write-Host '[dify] starting via docker compose (api/web)'
-docker compose -f $composePath up -d --no-recreate dify-api dify-web
+Write-Host '[dify] starting via docker compose (api/web/plugin-daemon)'
+docker compose -f $composePath up -d --no-recreate dify-api dify-web dify-plugin-daemon
 if ($LASTEXITCODE -ne 0) { Write-Error 'E_RUNTIME: docker compose up failed'; exit 5 }
 
 $healthUrl = "http://${BindAddress}:${HostPort}/"

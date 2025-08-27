@@ -18,11 +18,11 @@ Test-DockerInstalled
 
 $composePath = Join-Path $PSScriptRoot '..\\..\\..\\orchestration\\modules\\dify\\docker-compose.feature.yml' | Resolve-Path -ErrorAction SilentlyContinue
 if ($composePath -and (Test-Path $composePath)) {
-  Write-Host '[dify] status via docker compose (web/api)'
+  Write-Host '[dify] status via docker compose (web/api/plugin-daemon)'
   # 显示 compose 感知的容器
   docker compose -f $composePath ps
 } else {
-  foreach ($c in @('ai-dify-web','ai-dify-api')) {
+  foreach ($c in @('ai-dify-web','ai-dify-api','ai-dify-plugin-daemon')) {
     $state = ''
     try { $state = (docker inspect -f "{{.State.Status}}" $c) } catch { $state = 'not_found' }
     Write-Host ("[dify] {0}: {1}" -f $c, $state)

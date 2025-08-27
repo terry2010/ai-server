@@ -9,7 +9,11 @@
   "variables": {
     "DIFY_WEB_PORT": "${DIFY_WEB_PORT:18090}",
     "DIFY_API_PORT": "${DIFY_API_PORT:18091}",
-    "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}"
+    "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}",
+    "DIFY_SECRET_KEY": "${DIFY_SECRET_KEY:please-change-me}",
+    "DIFY_PLUGIN_INNER_API_KEY": "${DIFY_PLUGIN_INNER_API_KEY:QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}",
+    "DIFY_PLUGIN_DAEMON_KEY": "${DIFY_PLUGIN_DAEMON_KEY:lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}",
+    "DIFY_PLUGIN_DB": "${DIFY_PLUGIN_DB:ai_server_plugin}"
   },
   "healthCheck": { "type": "http", "target": "http://localhost:${DIFY_WEB_PORT:18090}/", "interval": 2000, "timeout": 20000, "retries": 30 },
   "compose": { "templateRef": "docker-compose.feature.yml" }

@@ -125,15 +125,17 @@ PowerShell 脚本（Win10，强制）：
 - 不产生与文档冲突的命名；若需新增字段，先在文档中补充再实现。
 - 修改 `package.json` 时，同步修正脚本依赖。
 
+
 ---
-
-项目已经开发了几天了，你要审阅项目， 确认C:\code\ai-server\doc\AI-Server-开发进度与待办-2025-08-24.md 写的是否正确
-
-接下来你要集中精神把 dify 集成到这个项目里， 如果你对dify 有什么不清楚的， 我把最新的源码clone 到 C:\code\ai-server\doc\system-code\dify 里了，你可以随时查看
-
-你要先写出今日todo 文档并保存到 doc目录中， 然后进入开发
-
 
 
 # 你的任务
-分析项目代码，确认开发进度
+
+项目已经开发了几天了，你要审阅项目
+
+接下来你要集中精神修复测试中的问题：
+1. 我在客户端界面中， 点击首次完整启动 按钮 启动dify， 登录进dify以后， 页面上有很多类似的toast 报错信息：Failed to request plugin daemon, url: plugin/b69da91f-8ada-42f6-9151-ba6f077b61f1/management/models
+
+## 背景信息
+1. 我已经将最新版的dify代码拉取到本地用作参考，保存地址在  C:\code\ai-server\doc\system-code\dify ， 如果你有什么需要查看官方代码的地方可以在这里查看， 官方的docker 文件目录是 C:\code\ai-server\doc\system-code\dify\docker 
+2. 我的测试方式是 执行reset脚本重置开发机环境  -》 启动客户端 -》 点击 【首次完整启动】按钮启动模块， 最后用浏览器进入网页查看功能是否都能使用，  你的修复要确保我的这个流程能测试通过。 scripts 里的各种启动停止脚本是给CI 使用的，人工测试一般不用

@@ -36,6 +36,10 @@ services:
       CONSOLE_WEB_URL: http://127.0.0.1:${DIFY_WEB_PORT:-18090}
       WEB_API_URL: http://127.0.0.1:${DIFY_API_PORT:-18091}
       APP_WEB_URL: http://127.0.0.1:${DIFY_WEB_PORT:-18090}
+      # 插件守护进程配置
+      PLUGIN_DAEMON_URL: http://ai-dify-plugin-daemon:5002
+      PLUGIN_DIFY_INNER_API_KEY: ${DIFY_PLUGIN_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+      INNER_API_KEY_FOR_PLUGIN: ${DIFY_PLUGIN_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
     volumes:
       - ai-dify-data:/data
     # 不在 compose 中写 depends_on（跨文件），由主进程按依赖拓扑启动
@@ -61,9 +65,51 @@ services:
       NEXT_PUBLIC_CONSOLE_API_URL: http://127.0.0.1:${DIFY_API_PORT:-18091}
     # 不在 compose 中写 depends_on（跨文件），由主进程按依赖拓扑启动
 
+  dify-plugin-daemon:
+    image: langgenius/dify-plugin-daemon:0.2.0-local
+    container_name: ai-dify-plugin-daemon
+    restart: unless-stopped
+    networks:
+      - ai-server-net
+    labels:
+      com.ai.role: feature
+      com.ai.module: dify
+      com.ai.requires: postgres,redis
+      com.ai.stack: ai-server
+    environment:
+      # 数据库配置（插件守护进程使用独立数据库）
+      DB_USERNAME: ${POSTGRES_USER:-ai_server}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ai_server_123}
+      DB_HOST: ${POSTGRES_HOST:-postgres}
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_DATABASE: ${DIFY_PLUGIN_DB:-ai_server_plugin}
+      # 插件守护进程配置
+      SERVER_PORT: 5002
+      SERVER_KEY: ${DIFY_PLUGIN_DAEMON_KEY:-lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}
+      MAX_PLUGIN_PACKAGE_SIZE: 52428800
+      PPROF_ENABLED: "false"
+      DIFY_INNER_API_URL: http://ai-dify-api:5001
+      DIFY_INNER_API_KEY: ${DIFY_PLUGIN_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+      PLUGIN_REMOTE_INSTALLING_HOST: "0.0.0.0"
+      PLUGIN_REMOTE_INSTALLING_PORT: 5003
+      PLUGIN_WORKING_PATH: /app/storage/cwd
+      FORCE_VERIFYING_SIGNATURE: "true"
+      PYTHON_ENV_INIT_TIMEOUT: 120
+      PLUGIN_MAX_EXECUTION_TIMEOUT: 600
+      PLUGIN_STDIO_BUFFER_SIZE: 1024
+      PLUGIN_STDIO_MAX_BUFFER_SIZE: 5242880
+      PLUGIN_STORAGE_TYPE: local
+      PLUGIN_STORAGE_LOCAL_ROOT: /app/storage
+      PLUGIN_INSTALLED_PATH: plugin
+      PLUGIN_PACKAGE_CACHE_PATH: plugin_packages
+      PLUGIN_MEDIA_CACHE_PATH: assets
+    volumes:
+      - ai-dify-plugin-data:/app/storage
+
 networks:
   ai-server-net:
     external: true
 
 volumes:
   ai-dify-data:
+  ai-dify-plugin-data:
