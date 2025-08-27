@@ -1,5 +1,10 @@
 -- 创建 Dify 插件守护进程数据库
--- PostgreSQL 语法 - 使用 DO 块来条件创建数据库
+-- PostgreSQL 语法 - 先安装 dblink 扩展
+
+-- 先创建 dblink 扩展
+CREATE EXTENSION IF NOT EXISTS dblink;
+
+-- 使用 DO 块来条件创建数据库
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ai_server_plugin') THEN

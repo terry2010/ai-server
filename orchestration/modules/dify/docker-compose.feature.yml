@@ -20,12 +20,12 @@ services:
       # 数据库（使用 infra 中的 Postgres 服务）
       DB_USERNAME: ${POSTGRES_USER:-ai_server}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-ai_server_123}
-      DB_HOST: ${POSTGRES_HOST:-postgres}
-      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_HOST: ai-postgres
+      DB_PORT: 5432
       DB_DATABASE: ${POSTGRES_DB:-ai_server}
       # Redis（使用 infra 中的 Redis 服务）
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_HOST: ai-redis
+      REDIS_PORT: 6379
       # 存储（OPENDAL 本地文件系统）
       OPENDAL_SCHEME: fs
       OPENDAL_FS_ROOT: /data/storage
@@ -44,6 +44,11 @@ services:
       PLUGIN_DAEMON_URL: http://ai-dify-plugin-daemon:5002
       PLUGIN_DIFY_INNER_API_KEY: ${DIFY_PLUGIN_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
       INNER_API_KEY_FOR_PLUGIN: ${DIFY_PLUGIN_INNER_API_KEY:-QaHbTe77CtuXmsfyhR7+vRjI/+XbV1AaFy691iy+kGDv2Jvy0/eAh8Y1}
+      # API -> Plugin Daemon 调用所用的服务端密钥（与 daemon 的 SERVER_KEY 保持一致）
+      PLUGIN_DAEMON_SERVER_KEY: ${DIFY_PLUGIN_DAEMON_KEY:-lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}
+      # 兼容可能的变量命名（API 仅会读取其中正确的一个，其余无害）
+      PLUGIN_DAEMON_KEY: ${DIFY_PLUGIN_DAEMON_KEY:-lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}
+      PLUGIN_DAEMON_API_KEY: ${DIFY_PLUGIN_DAEMON_KEY:-lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}
     volumes:
       - ai-dify-data:/data
     # 不在 compose 中写 depends_on（跨文件），由主进程按依赖拓扑启动
@@ -91,6 +96,7 @@ services:
       DB_DATABASE: ${DIFY_PLUGIN_DB:-ai_server_plugin}
       DB_DEFAULT_DATABASE: ${POSTGRES_DB:-ai_server}
       # 插件守护进程配置
+      MIGRATION_ENABLED: "true"
       SERVER_PORT: 5002
       SERVER_KEY: ${DIFY_PLUGIN_DAEMON_KEY:-lYkiYYT6owG+71oLerGzA7GXCgOT++6ovaezWAjpCjf+Sjc3ZtU+qUEi}
       MAX_PLUGIN_PACKAGE_SIZE: 52428800
