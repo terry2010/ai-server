@@ -1,0 +1,327 @@
+<template>
+  <div class="login-view">
+    <div class="login-container glass-effect">
+      <div class="login-header">
+        <div class="logo-section">
+          <div class="logo-icon">
+            <robot-outlined />
+          </div>
+          <h1 class="app-title">AI-Server</h1>
+          <p class="app-subtitle">管理平台</p>
+        </div>
+      </div>
+      
+      <div class="login-form">
+        <a-form
+          :model="loginForm"
+          :rules="rules"
+          @finish="handleLogin"
+          layout="vertical"
+        >
+          <a-form-item name="username" label="用户名">
+            <a-input
+              v-model:value="loginForm.username"
+              placeholder="请输入用户名"
+              size="large"
+            >
+              <template #prefix>
+                <user-outlined />
+              </template>
+            </a-input>
+          </a-form-item>
+          
+          <a-form-item name="password" label="密码">
+            <a-input-password
+              v-model:value="loginForm.password"
+              placeholder="请输入密码"
+              size="large"
+            >
+              <template #prefix>
+                <lock-outlined />
+              </template>
+            </a-input-password>
+          </a-form-item>
+          
+          <a-form-item>
+            <div class="login-options">
+              <a-checkbox v-model:checked="rememberMe">记住我</a-checkbox>
+              <a href="#" class="forgot-password">忘记密码？</a>
+            </div>
+          </a-form-item>
+          
+          <a-form-item>
+            <a-button
+              type="primary"
+              html-type="submit"
+              size="large"
+              :loading="loading"
+              class="login-button"
+              block
+            >
+              登录
+            </a-button>
+          </a-form-item>
+        </a-form>
+      </div>
+      
+      <div class="login-footer">
+        <p>还没有账户？ <a @click="goToRegister" class="register-link">立即注册</a></p>
+        <p>© 2025 AI-Server 管理平台. All rights reserved.</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  UserOutlined,
+  LockOutlined,
+  RobotOutlined
+} from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
+
+const router = useRouter()
+
+const loginForm = ref({
+  username: '',
+  password: ''
+})
+
+const rememberMe = ref(false)
+const loading = ref(false)
+
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  ]
+}
+
+const handleLogin = async () => {
+  loading.value = true
+  try {
+    // 模拟登录请求
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    message.success('登录成功！')
+    router.push('/')
+  } catch (error) {
+    message.error('登录失败，请重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const goToRegister = () => {
+  router.push('/register')
+}
+</script>
+
+<style scoped>
+.login-view {
+  min-height: 100vh;
+  background: linear-gradient(135deg, 
+    var(--primary-color) 0%, 
+    var(--primary-hover) 50%, 
+    #40a9ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-view::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    var(--primary-color) 0%, 
+    var(--primary-hover) 50%, 
+    #40a9ff 100%);
+  opacity: 0.95;
+}
+
+.login-view::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: 10%;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  animation: float 6s ease-in-out infinite;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 480px;
+  padding: var(--spacing-2xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all var(--transition-base);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.logo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.logo-icon {
+  width: 60px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-white);
+  font-size: 28px;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.app-title {
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  text-shadow: none;
+}
+
+.app-subtitle {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.login-form {
+  margin-bottom: var(--spacing-xl);
+}
+
+.login-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.forgot-password {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  transition: color var(--transition-base);
+}
+
+.forgot-password:hover {
+  color: var(--primary-hover);
+}
+
+.login-button {
+  background: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  color: var(--text-white);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.login-button:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.login-footer {
+  text-align: center;
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.login-footer p {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.register-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--transition-base);
+}
+
+.register-link:hover {
+  color: var(--primary-hover);
+}
+
+.login-form :deep(.ant-form-item-label > label) {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.login-form :deep(.ant-input),
+.login-form :deep(.ant-input-password) {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+}
+
+.login-form :deep(.ant-input::placeholder),
+.login-form :deep(.ant-input-password input::placeholder) {
+  color: var(--text-secondary);
+}
+
+.login-form :deep(.ant-input:focus),
+.login-form :deep(.ant-input-password:focus),
+.login-form :deep(.ant-input-focused) {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.login-form :deep(.ant-checkbox-wrapper) {
+  color: var(--text-primary);
+}
+
+.login-form :deep(.ant-checkbox-inner) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--border-light);
+}
+
+.login-form :deep(.ant-checkbox-checked .ant-checkbox-inner) {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .login-container {
+    padding: var(--spacing-xl);
+    margin: var(--spacing-md);
+  }
+}
+</style>
