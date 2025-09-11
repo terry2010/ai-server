@@ -12,7 +12,7 @@
               <a-avatar :size="120" :src="userProfile.avatar">
                 {{ userProfile.name.charAt(0) }}
               </a-avatar>
-              <a-button type="primary" class="upload-btn" @click="uploadAvatar">
+              <a-button type="primary" class="action-button save-btn" @click="uploadAvatar">
                 <template #icon>
                   <camera-outlined />
                 </template>
@@ -61,7 +61,7 @@
               </a-form-item>
               
               <a-form-item>
-                <a-button type="primary" html-type="submit" :loading="saving">
+                <a-button type="primary" html-type="submit" :loading="saving" class="action-button save-btn">
                   <template #icon>
                     <save-outlined />
                   </template>
@@ -157,9 +157,46 @@ const saveProfile = async () => {
   padding: var(--spacing-lg);
 }
 
-.upload-btn {
+/* 统一按钮样式 */
+.action-button {
   border-radius: var(--radius-md);
   font-weight: 500;
+  transition: all var(--transition-base);
+  font-size: var(--text-sm);
+  height: 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.action-button:hover::before {
+  left: 100%;
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.save-btn {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+  border: none;
+  color: var(--text-white) !important;
+  box-shadow: 0 0 20px rgba(24, 144, 255, 0.3);
+}
+
+.save-btn:hover {
+  box-shadow: 0 8px 25px rgba(24, 144, 255, 0.4), 0 0 30px rgba(24, 144, 255, 0.2);
 }
 
 @media (max-width: 768px) {

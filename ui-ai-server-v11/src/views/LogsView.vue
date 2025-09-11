@@ -11,14 +11,14 @@
           <a-select-option value="debug">调试</a-select-option>
         </a-select>
         
-        <a-button @click="clearLogs" danger>
+        <a-button @click="clearLogs" danger class="action-button stop-btn">
           <template #icon>
             <delete-outlined />
           </template>
           清空日志
         </a-button>
         
-        <a-button @click="refreshLogs" type="primary">
+        <a-button @click="refreshLogs" type="primary" class="action-button refresh-btn">
           <template #icon>
             <reload-outlined />
           </template>
@@ -251,5 +251,58 @@ onMounted(() => {
   .log-container {
     height: calc(100vh - 250px);
   }
+}
+
+/* 统一按钮样式 */
+.action-button {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-base);
+  font-size: var(--text-sm);
+  height: 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.action-button:hover::before {
+  left: 100%;
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.refresh-btn {
+  background: linear-gradient(135deg, var(--warning-color) 0%, #ffa940 100%);
+  border: none;
+  color: var(--text-white) !important;
+  box-shadow: 0 0 20px rgba(250, 173, 20, 0.3);
+}
+
+.refresh-btn:hover {
+  box-shadow: 0 8px 25px rgba(250, 173, 20, 0.4), 0 0 30px rgba(250, 173, 20, 0.2);
+}
+
+.stop-btn {
+  background: linear-gradient(135deg, var(--error-color) 0%, #ff7875 100%);
+  border: none;
+  color: var(--text-white) !important;
+  box-shadow: 0 0 20px rgba(255, 59, 48, 0.3);
+}
+
+.stop-btn:hover {
+  box-shadow: 0 8px 25px rgba(255, 59, 48, 0.4), 0 0 30px rgba(255, 59, 48, 0.2);
 }
 </style>

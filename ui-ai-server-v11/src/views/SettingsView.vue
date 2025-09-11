@@ -85,21 +85,21 @@
         </template>
         
         <div class="settings-actions">
-          <a-button type="primary" size="large" @click="saveSettings">
+          <a-button type="primary" size="large" @click="saveSettings" class="action-button save-btn">
             <template #icon>
               <save-outlined />
             </template>
             保存设置
           </a-button>
           
-          <a-button size="large" @click="resetSettings">
+          <a-button size="large" @click="resetSettings" class="action-button refresh-btn">
             <template #icon>
               <reload-outlined />
             </template>
             重置
           </a-button>
           
-          <a-button size="large" @click="testConnection">
+          <a-button size="large" @click="testConnection" class="action-button">
             <template #icon>
               <api-outlined />
             </template>
@@ -289,5 +289,58 @@ onMounted(() => {
   .settings-actions .ant-btn {
     width: 100%;
   }
+}
+
+/* 统一按钮样式 */
+.action-button {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-base);
+  font-size: var(--text-sm);
+  height: 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.action-button:hover::before {
+  left: 100%;
+}
+
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.save-btn {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+  border: none;
+  color: var(--text-white) !important;
+  box-shadow: 0 0 20px rgba(24, 144, 255, 0.3);
+}
+
+.save-btn:hover {
+  box-shadow: 0 8px 25px rgba(24, 144, 255, 0.4), 0 0 30px rgba(24, 144, 255, 0.2);
+}
+
+.refresh-btn {
+  background: linear-gradient(135deg, var(--warning-color) 0%, #ffa940 100%);
+  border: none;
+  color: var(--text-white) !important;
+  box-shadow: 0 0 20px rgba(250, 173, 20, 0.3);
+}
+
+.refresh-btn:hover {
+  box-shadow: 0 8px 25px rgba(250, 173, 20, 0.4), 0 0 30px rgba(250, 173, 20, 0.2);
 }
 </style>
