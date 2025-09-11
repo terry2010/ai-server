@@ -92,10 +92,11 @@ const services = ref([
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--spacing-xl);
-  justify-items: center;
-  max-width: calc(100vw - 240px - 48px);
+  justify-items: stretch;
+  justify-content: center;
+  max-width: calc(100vw - 240px - 32px);
   margin: 0 auto;
   padding: 0 var(--spacing-md);
 }
@@ -112,9 +113,5 @@ const services = ref([
   }
 }
 
-@media (min-width: 1400px) {
-  .services-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
+
 </style>

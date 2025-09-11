@@ -249,7 +249,9 @@ const viewLogs = () => {
   align-items: center;
   justify-content: center;
   font-size: 24px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+  /* 默认内阴影，模拟凹陷效果 */
+  box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.12), inset -2px -2px 6px rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   transition: all var(--transition-base);
 }
 
