@@ -312,12 +312,41 @@ const goToRegister = () => {
 .login-form :deep(.ant-input-password .ant-input),
 .login-form :deep(.ant-input-password-large),
 .login-form :deep(.ant-input-affix-wrapper) {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: #ffffff !important;
+  border: 1px solid var(--border-light) !important;
   color: var(--text-primary) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: none !important;
   border-radius: 8px !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.2s ease !important;
+  background-clip: padding-box !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* 解决密码框里内层 input 背景叠加导致的“环形底色” */
+.login-form :deep(.ant-input-affix-wrapper .ant-input) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 兼容 Chrome 自动填充导致的内阴影边框 */
+.login-form :deep(input:-webkit-autofill),
+.login-form :deep(textarea:-webkit-autofill),
+.login-form :deep(.ant-input-affix-wrapper input:-webkit-autofill) {
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  caret-color: var(--text-primary) !important;
+  transition: background-color 9999s ease-out 0s !important;
+}
+
+/* 去除可能的内置 outline 与内阴影 */
+.login-form :deep(.ant-input),
+.login-form :deep(.ant-input-password .ant-input) {
+  outline: none !important;
+  box-shadow: none !important;
+  background-clip: padding-box !important;
 }
 
 .login-form :deep(.ant-input::placeholder),
@@ -329,10 +358,20 @@ const goToRegister = () => {
 .login-form :deep(.ant-input-password:hover),
 .login-form :deep(.ant-input-password:hover .ant-input),
 .login-form :deep(.ant-input-affix-wrapper:hover) {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12) !important;
-  border-color: rgba(24, 144, 255, 0.3) !important;
-  background: rgba(255, 255, 255, 0.95) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
+  border-color: rgba(24, 144, 255, 0.25) !important;
+  background: #ffffff !important;
+}
+
+/* 悬浮/聚焦时也强制内层 input 无边框与阴影，避免出现内圈 */
+.login-form :deep(.ant-input-affix-wrapper:hover .ant-input),
+.login-form :deep(.ant-input-affix-wrapper-focused .ant-input),
+.login-form :deep(.ant-input-affix-wrapper:focus .ant-input) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .login-form :deep(.ant-input:focus),
@@ -343,7 +382,38 @@ const goToRegister = () => {
 .login-form :deep(.ant-input-affix-wrapper-focused) {
   border-color: var(--primary-color) !important;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
-  background: rgba(255, 255, 255, 0.95) !important;
+  background: #ffffff !important;
+}
+
+/* 兼容部分环境：当内层 input 获得焦点时，让外层也呈现焦点样式 */
+.login-form :deep(.ant-input-affix-wrapper:has(input:focus)) {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  background: #ffffff !important;
+}
+
+/* 兼容更广：使用 focus-within 触发外层焦点样式 */
+.login-form :deep(.ant-input-affix-wrapper:focus-within) {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  background: #ffffff !important;
+}
+
+/* 避免 wrapper 的内边距显出“第二层边” */
+.login-form :deep(.ant-input-affix-wrapper) {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  background-clip: padding-box !important;
+}
+
+/* 聚焦输入中：内层 input 仍保持透明且无边框/阴影，避免第二层描边 */
+.login-form :deep(.ant-input-password .ant-input:focus),
+.login-form :deep(.ant-input-affix-wrapper:focus .ant-input),
+.login-form :deep(.ant-input-affix-wrapper-focused .ant-input) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 .login-form :deep(.ant-checkbox-wrapper) {
