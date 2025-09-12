@@ -92,22 +92,60 @@ const services = ref([
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+  gap: 20px;
   padding: 16px;
-  max-width: 1200px;
+  max-width: 1550px;
   margin: 0 auto;
+  justify-content: center;
+  
+  /* 默认3列布局 - 适用于1920px */
+  grid-template-columns: repeat(3, 1fr);
 }
 
 /* 响应式设计 */
+@media (max-width: 1440px) {
+  .services-grid {
+    /* 2列布局 - 适用于1440px及以下 */
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 1000px;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .services-grid {
+    /* 2列布局 - 1280px优化 */
+    max-width: 900px;
+    gap: 20px;
+  }
+}
+
+/* 大屏优化：2560px(2K/2.5K) 及更大，使用4列布局 */
+@media (min-width: 2200px) {
+  .services-grid {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 2060px; /* 4列卡片 + 间距更协调，避免过宽 */
+    gap: 24px;
+  }
+}
+
 @media (max-width: 768px) {
   .home-view {
     padding: var(--spacing-md);
   }
   
   .services-grid {
+    /* 单列布局 - 移动端 */
     grid-template-columns: 1fr;
     gap: var(--spacing-lg);
+    max-width: 400px;
+  }
+}
+
+@media (max-width: 480px) {
+  .services-grid {
+    padding: 8px;
+    max-width: calc(100vw - 32px);
   }
 }
 

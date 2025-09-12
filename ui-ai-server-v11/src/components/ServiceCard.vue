@@ -415,22 +415,8 @@ const viewLogs = () => {
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
-  .service-card {
-    width: 300px;
-  }
-}
-
-@media (max-width: 992px) {
-  .service-card {
-    width: 280px;
-  }
-}
-
 @media (max-width: 768px) {
   .service-card {
-    width: 100%;
-    max-width: 400px;
     height: auto;
     min-height: 240px;
   }
@@ -441,13 +427,6 @@ const viewLogs = () => {
   
   .card-actions {
     flex-direction: column;
-  }
-}
-
-@media (max-width: 480px) {
-  .service-card {
-    width: calc(100vw - 32px);
-    margin: 0 auto;
   }
 }
 </style>
