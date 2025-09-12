@@ -184,22 +184,26 @@ const viewLogs = () => {
 
 <style scoped>
 .service-card {
-  width: 320px;
+  width: 100%;
   height: 280px;
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-lg);
+  border-radius: 16px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  transition: all var(--transition-base);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .service-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
 }
 
 .service-card:hover .service-icon {
@@ -227,7 +231,18 @@ const viewLogs = () => {
 
 .card-running::before {
   opacity: 1;
-  background: linear-gradient(90deg, var(--success-color), #40a9ff);
+  background: linear-gradient(90deg, #52c41a, #40a9ff, #52c41a);
+  background-size: 200% 100%;
+  animation: flowingLight 3s ease-in-out infinite;
+}
+
+@keyframes flowingLight {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .card-header {

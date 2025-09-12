@@ -50,12 +50,12 @@ body {
 
 /* 卡片阴影效果 */
 .card-shadow {
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   transition: box-shadow var(--transition-base);
 }
 
 .card-shadow:hover {
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
 }
 
 /* 状态指示器 */
@@ -120,15 +120,17 @@ body {
 
 /* 卡片样式增强 */
 .ant-card {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   transition: all var(--transition-base);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
 }
 
 .ant-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
 }
 
 /* Tab 样式增强 */

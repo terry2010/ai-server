@@ -166,15 +166,20 @@ const goToRegister = () => {
   width: 100%;
   max-width: 480px;
   padding: var(--spacing-2xl);
-  border-radius: var(--radius-xl);
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   position: relative;
   z-index: 2;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  transition: all var(--transition-base);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-container:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
 }
 
 .login-header {
@@ -303,10 +308,16 @@ const goToRegister = () => {
 }
 
 .login-form :deep(.ant-input),
-.login-form :deep(.ant-input-password) {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid var(--border-light);
-  color: var(--text-primary);
+.login-form :deep(.ant-input-password),
+.login-form :deep(.ant-input-password .ant-input),
+.login-form :deep(.ant-input-password-large),
+.login-form :deep(.ant-input-affix-wrapper) {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 8px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .login-form :deep(.ant-input::placeholder),
@@ -314,11 +325,25 @@ const goToRegister = () => {
   color: var(--text-secondary);
 }
 
+.login-form :deep(.ant-input:hover),
+.login-form :deep(.ant-input-password:hover),
+.login-form :deep(.ant-input-password:hover .ant-input),
+.login-form :deep(.ant-input-affix-wrapper:hover) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12) !important;
+  border-color: rgba(24, 144, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
 .login-form :deep(.ant-input:focus),
 .login-form :deep(.ant-input-password:focus),
-.login-form :deep(.ant-input-focused) {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+.login-form :deep(.ant-input-focused),
+.login-form :deep(.ant-input-password .ant-input:focus),
+.login-form :deep(.ant-input-affix-wrapper:focus),
+.login-form :deep(.ant-input-affix-wrapper-focused) {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
 }
 
 .login-form :deep(.ant-checkbox-wrapper) {

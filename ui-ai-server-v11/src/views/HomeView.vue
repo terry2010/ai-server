@@ -92,13 +92,11 @@ const services = ref([
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--spacing-xl);
-  justify-items: stretch;
-  justify-content: center;
-  max-width: calc(100vw - 240px - 32px);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 var(--spacing-md);
 }
 
 /* 响应式设计 */

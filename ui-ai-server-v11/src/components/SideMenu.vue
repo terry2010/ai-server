@@ -130,13 +130,16 @@ const handleMenuSelect = ({ key }: { key: string }) => {
   width: 240px;
   height: calc(100vh - 60px);
   padding: var(--spacing-lg);
-  border-right: 1px solid var(--border-light);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   position: fixed;
   left: 0;
   top: 60px;
   z-index: 50;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.08);
 }
 
 .menu-header {
