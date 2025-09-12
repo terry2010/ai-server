@@ -204,7 +204,9 @@ const viewLogs = () => {
 
 .service-card:hover .service-icon {
   transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), 0 6px 15px rgba(0, 0, 0, 0.15);
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.12), inset -1px -1px 3px rgba(255, 255, 255, 0.6), 0 12px 30px rgba(0, 0, 0, 0.2), 0 6px 15px rgba(0, 0, 0, 0.15);
+
+  /* box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), 0 6px 15px rgba(0, 0, 0, 0.15); */
 }
 
 .service-card::before {
