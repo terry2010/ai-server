@@ -26,7 +26,8 @@ function createWindow() {
     webPreferences: {
       preload: path.resolve(__dirname, 'preload.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webviewTag: true
     }
   });
 
@@ -54,6 +55,7 @@ app.whenReady().then(() => {
     require('./ipc/docker');
     require('./ipc/modules');
     require('./ipc/config');
+    require('./ipc/window');
   } catch (e) {
     console.error('[main] failed to load ipc handlers:', e);
   }

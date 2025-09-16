@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import WebAppView from '../views/WebAppView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,26 +15,10 @@ const router = createRouter({
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
     },
-    {
-      path: '/n8n',
-      name: 'n8n',
-      component: HomeView,
-    },
-    {
-      path: '/dify',
-      name: 'dify',
-      component: HomeView,
-    },
-    {
-      path: '/oneapi',
-      name: 'oneapi',
-      component: HomeView,
-    },
-    {
-      path: '/ragflow',
-      name: 'ragflow',
-      component: HomeView,
-    },
+    { path: '/n8n', name: 'n8n', component: WebAppView },
+    { path: '/dify', name: 'dify', component: WebAppView },
+    { path: '/oneapi', name: 'oneapi', component: WebAppView },
+    { path: '/ragflow', name: 'ragflow', component: WebAppView },
     {
       path: '/logs',
       name: 'logs',

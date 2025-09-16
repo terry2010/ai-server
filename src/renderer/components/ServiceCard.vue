@@ -11,8 +11,9 @@
         </div>
       </div>
       <div class="status-section">
-        <span :class="['status-indicator', statusClass]"></span>
-        <span class="status-text">{{ statusText }}</span>
+        <span v-if="props.status!=='loading'" :class="['status-indicator', statusClass]"></span>
+        <a-spin v-else size="small" />
+        <span class="status-text">{{ props.status==='loading' ? '加载中' : statusText }}</span>
       </div>
     </div>
     
@@ -50,20 +51,22 @@
       <a-button 
         v-if="!isRunning" 
         type="primary" 
-        :loading="isLoading"
+        :loading="isBusy || props.status==='loading'"
+        :disabled="props.status==='loading'"
         @click="startService"
         class="action-button start-btn"
       >
         <template #icon>
           <play-circle-outlined />
         </template>
-        启动
+        {{ props.status==='loading' ? '加载中' : '启动' }}
       </a-button>
       
       <a-button 
         v-else 
         danger 
-        :loading="isLoading"
+        :loading="isBusy"
+        :disabled="props.status==='loading'"
         @click="stopService"
         class="action-button stop-btn"
       >
@@ -73,7 +76,7 @@
         停止
       </a-button>
       
-      <a-button @click="openService" class="action-button">
+      <a-button @click="openService" class="action-button" :disabled="props.status==='loading'">
         <template #icon>
           <link-outlined />
         </template>
@@ -92,6 +95,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { startModule, stopModule } from '../services/ipc'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -107,7 +112,7 @@ interface Props {
   serviceName: string
   serviceDescription: string
   serviceType: 'n8n' | 'dify' | 'oneapi' | 'ragflow'
-  status: 'running' | 'stopped' | 'error'
+  status: 'running' | 'stopped' | 'error' | 'loading'
   cpuUsage: number
   memoryUsage: number
   port: string
@@ -115,10 +120,10 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const isLoading = ref(false)
+const isBusy = ref(false)
 
 const isRunning = computed(() => props.status === 'running')
-const statusClass = computed(() => `status-${props.status}`)
+const statusClass = computed(() => props.status === 'loading' ? 'status-loading' : `status-${props.status}`)
 
 const statusText = computed(() => {
   switch (props.status) {
@@ -149,33 +154,36 @@ const iconColor = computed(() => {
   }
 })
 
+const emit = defineEmits<{ 'status-changed': [] }>()
+const router = useRouter()
+
 const startService = async () => {
-  isLoading.value = true
+  isBusy.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    console.log(`启动 ${props.serviceName} 服务`)
+    await startModule(props.serviceType)
+    emit('status-changed')
+  } catch (e) {
+    console.error(e)
   } finally {
-    isLoading.value = false
+    isBusy.value = false
   }
 }
 
 const stopService = async () => {
-  isLoading.value = true
+  isBusy.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    console.log(`停止 ${props.serviceName} 服务`)
+    await stopModule(props.serviceType)
+    emit('status-changed')
+  } catch (e) {
+    console.error(e)
   } finally {
-    isLoading.value = false
+    isBusy.value = false
   }
 }
 
-const openService = () => {
-  window.open(`http://localhost:${props.port}`, '_blank')
-}
+const openService = () => { router.push({ name: props.serviceType }) }
 
-const viewLogs = () => {
-  console.log(`查看 ${props.serviceName} 日志`)
-}
+const viewLogs = () => { router.push({ name: 'logs', query: { module: props.serviceType } }) }
 </script>
 
 <style scoped>
@@ -189,12 +197,14 @@ const viewLogs = () => {
 .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
 .service-info { display: flex; gap: var(--spacing-md); flex: 1; }
 .service-icon { width: 48px; height: 48px; border-radius: var(--radius-lg); background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.12), inset -2px -2px 6px rgba(255, 255, 255, 0.6); border: 1px solid rgba(0, 0, 0, 0.06); transition: all var(--transition-base); }
+.service-card:hover .service-icon { transform: translateY(-2px) scale(1.06); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(0,0,0,0.06); }
 .service-details { flex: 1; }
 .service-name { font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); margin: 0 0 var(--spacing-xs) 0; }
 .service-description { font-size: var(--text-sm); color: var(--text-secondary); margin: 0; line-height: 1.4; }
 
 .status-section { display: flex; align-items: center; gap: var(--spacing-xs); }
 .status-text { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); }
+.status-loading { background-color: var(--text-tertiary); animation: pulse 1.2s infinite; }
 
 .card-content { flex: 1; }
 .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }

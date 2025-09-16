@@ -49,7 +49,11 @@ export const IPC = {
   ModuleStopStream: 'ai/module/stopStream',
   ModuleStatus: 'ai/module/status',
   ModuleClear: 'ai/module/clear',
+  ModuleLogs: 'ai/module/logs',
   ConfigGet: 'ai/config/get',
   ConfigSet: 'ai/config/set',
   ModuleLogEvent: 'ai/module/log',
+  WindowMinimize: 'ai/window/minimize',
+  WindowMaximize: 'ai/window/maximize',
+  WindowClose: 'ai/window/close',
 } as const;

@@ -1,17 +1,25 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
+import { computed } from 'vue'
 import TopTabs from './components/TopTabs.vue'
 import SideMenu from './components/SideMenu.vue'
+
+const route = useRoute()
+const showSide = computed(() => {
+  const n = ((route.name as string) || '').toLowerCase()
+  const hide = ['n8n','dify','oneapi','ragflow','login','register']
+  return !hide.includes(n)
+})
 </script>
 
 <template>
   <div class="app-layout">
     <TopTabs />
     
-    <div class="main-container">
-      <SideMenu />
+    <div class="main-container" :class="{ 'no-side': !showSide }">
+      <SideMenu v-if="showSide" />
       
-      <div class="content-area">
+      <div class="content-area" :class="{ 'full': !showSide }">
         <RouterView />
       </div>
     </div>
@@ -42,6 +50,8 @@ import SideMenu from './components/SideMenu.vue'
   position: relative;
   z-index: 1;
 }
+.content-area.full { margin-left: 0; }
+.main-container.no-side { padding-left: 0; }
 
 /* 响应式设计 */
 @media (max-width: 768px) {

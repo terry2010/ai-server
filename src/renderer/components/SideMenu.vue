@@ -89,8 +89,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import {
   DashboardOutlined,
   SettingOutlined,
@@ -103,26 +103,39 @@ import {
 } from '@ant-design/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 
-const selectedKeys = ref(['dashboard'])
+const selectedKeys = ref<string[]>(['dashboard'])
 
 const handleMenuSelect = ({ key }: { key: string }) => {
   selectedKeys.value = [key]
   
   // 路由跳转逻辑
   if (key === 'dashboard') {
-    router.push('/')
+    router.push({ name: 'home' })
   } else if (key.endsWith('-settings')) {
     const settingType = key.replace('-settings', '')
     router.push(`/settings/${settingType}`)
   } else if (key === 'logs') {
-    router.push('/logs')
+    if (String(route.name || '').toLowerCase() === 'logs') {
+      window.dispatchEvent(new CustomEvent('reopen-logs'))
+    } else {
+      router.push('/logs')
+    }
   } else if (key === 'monitoring') {
     router.push('/monitoring')
   } else {
     router.push(`/${key}`)
   }
 }
+
+// 根据路由变化同步选中项
+watch(() => route.name, (n) => {
+  const name = String(n || '').toLowerCase()
+  if (name === 'home') selectedKeys.value = ['dashboard']
+  else if (name === 'logs') selectedKeys.value = ['logs']
+  else if (name === 'monitoring') selectedKeys.value = ['monitoring']
+})
 </script>
 
 <style scoped>
@@ -150,6 +163,7 @@ const handleMenuSelect = ({ key }: { key: string }) => {
 .custom-menu :deep(.ant-menu-item) { border-radius: var(--radius-md); margin: var(--spacing-xs) 0; padding: var(--spacing-md) var(--spacing-lg); height: auto; line-height: 1.5; transition: all var(--transition-base); color: var(--text-secondary); font-weight: 500; }
 .custom-menu :deep(.ant-menu-item:hover) { background: linear-gradient(135deg, var(--primary-light) 0%, rgba(0, 122, 255, 0.1) 100%); color: var(--primary-color); transform: translateX(4px); }
 .custom-menu :deep(.ant-menu-item-selected) { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: var(--text-white) !important; box-shadow: var(--shadow-md); }
+.custom-menu :deep(.ant-menu-item-selected:hover) { color: var(--text-primary) !important; }
 .custom-menu :deep(.ant-menu-divider) { background-color: var(--border-light); margin: var(--spacing-md) 0; }
 
 .menu-footer { padding-top: var(--spacing-lg); border-top: 1px solid var(--border-light); }

@@ -14,11 +14,61 @@ import { checkPortsConflict } from './ports';
 import { composeUp, composeStop, composeUpStream, composeStopStream, startContainerStream } from './compose-runner';
 
 type LogEntry = { cmd: string; stdout?: string; stderr?: string };
+export interface AppLogEntry { id: string; timestamp: string; service: string; module: string; moduleType: ModuleType; level: 'error'|'warn'|'info'|'debug'|'log'; message: string }
 
 async function execAndLog(cmd: string, logs: LogEntry[], cwd?: string) {
   const r = await run(cmd, cwd);
   logs.push({ cmd, stdout: r.stdout, stderr: r.stderr });
   return r;
+}
+
+// 读取模块相关容器的最近日志（聚合返回）
+export async function getModuleLogs(name?: ModuleName, tail: number = 200): Promise<IpcResponse<{ entries: AppLogEntry[] }>> {
+  try {
+    const reg = loadRegistry();
+    const mods = reg.modules || [];
+    let targets: string[] = [];
+    if (name) {
+      const self = mods.find((m: any) => m.name === name);
+      if (!self) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
+      const services = self.type === 'feature' ? servicesForModule(name) : [name];
+      targets = services.map(s => containerNameFor(s));
+    } else {
+      // 未指定模块时，列出所有已注册模块的容器名
+      targets = mods.flatMap((m: any) => (m.type === 'feature' ? servicesForModule(m.name as ModuleName) : [m.name])).map(s => containerNameFor(s as any));
+    }
+    const entries: AppLogEntry[] = [];
+    for (const cname of targets) {
+      try {
+        const { stdout } = await run(`docker logs --tail ${tail} --timestamps ${cname}`);
+        const lines = stdout.split(/\r?\n/).filter(Boolean);
+        for (const line of lines) {
+          // 形如: 2025-09-16T19:22:10.123456789Z message...
+          const m = line.match(/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$/);
+          const ts = m ? m[1] : new Date().toISOString();
+          const msg = m ? m[2] : line;
+          // 简单等级推断
+          const level: AppLogEntry['level'] = /error|ERR|\[error\]/i.test(msg) ? 'error' : /warn|\[warn\]/i.test(msg) ? 'warn' : /debug|\[debug\]/i.test(msg) ? 'debug' : /info|\[info\]/i.test(msg) ? 'info' : 'log';
+          // 反查模块名称与类型
+          let modName: string = ''
+          let modType: ModuleType = 'feature'
+          for (const m of mods) {
+            const arr = (m.type === 'feature' ? servicesForModule(m.name as ModuleName) : [m.name])
+            const names = arr.map(s => containerNameFor(s as ModuleName))
+            if (names.includes(cname)) { modName = m.name; modType = m.type; break }
+          }
+          entries.push({ id: `${cname}-${ts}-${entries.length}`, timestamp: ts, service: cname, module: modName || 'unknown', moduleType: modType, level, message: msg });
+        }
+      } catch {
+        // 忽略单容器日志失败
+      }
+    }
+    // 按时间倒序
+    entries.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+    return { success: true, data: { entries } };
+  } catch (e: any) {
+    return { success: false, code: 'E_RUNTIME', message: String(e?.message ?? e) };
+  }
 }
 
 // 向渲染进程发送一条标准输出日志（避免把纯文本当作命令执行）
@@ -144,10 +194,8 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
       const depItem = modules.find(m => m.name === dep);
       if (!depItem) continue;
       const hc = (depItem as any).healthCheck;
-      try { emitStdout(sender, streamId, `[debug] wait health for dep=${dep} target=${String(hc?.target || '')}`); } catch {}
       const ok = await waitHealth(hc);
       if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `依赖未就绪: ${dep}` };
-      try { emitStdout(sender, streamId, `[debug] dep ready: ${dep}`); } catch {}
     }
   }
 
@@ -304,11 +352,17 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
       states.push(state);
     }
 
-    // 计算聚合状态
+    // 计算聚合状态：
+    // - 全部 running => running
+    // - 全部属于停止态（exited/created/dead/stopped/paused）=> stopped
+    // - 其余（混合态、restarting 等）=> error
     let status: ModuleStatus['status'] = 'stopped';
-    if (states.length > 0 && states.every(s => s === 'running')) status = 'running';
-    else if (states.some(s => s === 'restarting' || s === 'exited' || s === 'dead')) status = 'error';
-    else status = 'stopped';
+    const allRunning = states.length > 0 && states.every(s => s === 'running');
+    const isStoppedState = (s: string) => ['exited', 'created', 'dead', 'stopped', 'paused'].includes(s);
+    const allFullyStopped = states.length > 0 && states.every(s => isStoppedState(s));
+    if (allRunning) status = 'running';
+    else if (allFullyStopped) status = 'stopped';
+    else status = 'error';
     const running = status === 'running';
 
     // usedBy 计算（仅当该模块为基础服务时才有意义）

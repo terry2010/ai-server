@@ -90,16 +90,26 @@
       
       <!-- Windows 窗口控制按钮 -->
       <div class="windows-controls">
-        <div class="windows-button menu" @click="handleMenu" title="菜单">
-          <menu-outlined />
-        </div>
-        <div class="windows-button minimize" @click="handleMinimize" title="最小化">
+        <a-dropdown trigger="['click']" placement="bottomLeft" :mouseEnterDelay="0" :mouseLeaveDelay="0">
+          <template #overlay>
+            <a-menu>
+              <a-menu-item key="k1">示例菜单项一</a-menu-item>
+              <a-menu-item key="k2">示例菜单项二</a-menu-item>
+              <a-menu-divider />
+              <a-menu-item key="k3">关于 AI-Server</a-menu-item>
+            </a-menu>
+          </template>
+          <div class="windows-button menu hit-area" title="菜单">
+            <menu-outlined />
+          </div>
+        </a-dropdown>
+        <div class="windows-button minimize hit-area" @click="handleMinimize" title="最小化">
           <minus-outlined />
         </div>
-        <div class="windows-button maximize" @click="handleMaximize" title="最大化">
+        <div class="windows-button maximize hit-area" @click="handleMaximize" title="最大化">
           <border-outlined />
         </div>
-        <div class="windows-button close" @click="handleClose" title="关闭">
+        <div class="windows-button close hit-area" @click="handleClose" title="关闭">
           <close-outlined />
         </div>
       </div>
@@ -108,8 +118,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { moduleStore } from '../stores/modules'
+import { windowMinimize, windowMaximize, windowClose } from '../services/ipc'
 import {
   UserOutlined,
   SettingOutlined,
@@ -123,6 +135,7 @@ import {
 } from '@ant-design/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
 const activeTab = ref('home')
 
 // 模拟用户信息
@@ -131,23 +144,28 @@ const userInfo = ref({
   avatar: ''
 })
 
-// 模拟服务状态
-const serviceStatus = ref({
-  n8n: 'running',
-  dify: 'stopped',
-  oneapi: 'running',
-  ragflow: 'error'
-})
-
 const getStatusClass = (service: string) => {
-  const status = (serviceStatus.value as any)[service]
+  const status = (moduleStore.dots as any)[service] || 'loading'
   return `status-${status}`
 }
 
 const handleTabChange = (key: string) => {
   activeTab.value = key
-  router.push(`/${key === 'home' ? '' : key}`)
+  if (key === 'home') router.push({ name: 'home' })
+  else router.push({ name: key as any })
 }
+
+// 根据当前路由同步顶部选中项
+function syncTabWithRoute() {
+  const name = (route.name as string) || ''
+  const lower = name.toLowerCase()
+  if (['home','n8n','dify','oneapi','ragflow'].includes(lower)) {
+    activeTab.value = lower === '' ? 'home' : lower
+  }
+}
+
+onMounted(syncTabWithRoute)
+watch(() => route.name, syncTabWithRoute)
 
 const handleUserMenuClick = ({ key }: { key: string }) => {
   switch (key) {
@@ -164,17 +182,17 @@ const handleUserMenuClick = ({ key }: { key: string }) => {
 }
 
 // 窗口控制函数（后续可接 IPC）
-const handleClose = () => { console.log('关闭窗口') }
-const handleMinimize = () => { console.log('最小化窗口') }
-const handleMaximize = () => { console.log('最大化/全屏窗口') }
-const handleMenu = () => { console.log('打开菜单') }
+const handleClose = () => { windowClose() }
+const handleMinimize = () => { windowMinimize() }
+const handleMaximize = () => { windowMaximize() }
+const handleMenu = () => { /* 示例菜单通过 a-dropdown 在右侧 user-section 已体现 */ }
 </script>
 
 <style scoped>
 .top-tabs {
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  padding: 0 var(--spacing-lg);
+  padding: 0 8px; /* 两侧留白，避免过于贴边，同时保留较大点击区 */
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -225,6 +243,7 @@ const handleMenu = () => { console.log('打开菜单') }
 .custom-tabs :deep(.ant-tabs-tab::before) { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, transparent 0%, rgba(0, 122, 255, 0.05) 100%); opacity: 0; transition: opacity var(--transition-base); }
 .custom-tabs :deep(.ant-tabs-tab:hover) { background: var(--bg-tertiary); color: var(--primary-color); transform: translateY(-2px) scale(1.02); }
 .custom-tabs :deep(.ant-tabs-tab-active) { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: var(--text-white) !important; box-shadow: var(--shadow-md); }
+.custom-tabs :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) { color: var(--text-white) !important; }
 .custom-tabs :deep(.ant-tabs-ink-bar) { display: none; }
 
 .tab-content { display: flex; align-items: center; gap: var(--spacing-sm); }
@@ -236,14 +255,6 @@ const handleMenu = () => { console.log('打开菜单') }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
 
-/* Mac 窗口控制按钮 */
-.mac-controls { display: flex; align-items: center; gap: 8px; margin-right: var(--spacing-lg); }
-.mac-button { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; transition: all var(--transition-base); position: relative; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: bold; color: transparent; }
-.mac-button.close { background-color: #ff5f57; }
-.mac-button.minimize { background-color: #ffbd2e; }
-.mac-button.maximize { background-color: #28ca42; }
-.mac-button:hover { transform: scale(1.1); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); color: rgba(0, 0, 0, 0.6); }
-.mac-button.close:hover::after { content: '×'; }
 .mac-button.minimize:hover::after { content: '−'; }
 .mac-button.maximize:hover::after { content: '+'; }
 
