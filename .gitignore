@@ -6,3 +6,5 @@
 /.idea
 
 
+# Ignore node_modules inside all UI subprojects like ui-ai-server-v1 ... ui-ai-server-v11
+/ui-ai-server-*/node_modules/

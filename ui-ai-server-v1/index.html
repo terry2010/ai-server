@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Server 管理面板</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <nav class="top-nav">
+            <div class="nav-brand">AI Server</div>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="home">开始</button>
+                <button class="nav-tab" data-tab="dify">Dify</button>
+                <button class="nav-tab" data-tab="n8n">n8n</button>
+                <button class="nav-tab" data-tab="ragflow">RAGFlow</button>
+                <button class="nav-tab" data-tab="oneapi">OneAPI</button>
+                <button class="nav-tab" data-tab="settings">系统设置</button>
+            </div>
+        </nav>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <!-- 首页 -->
+            <div class="tab-content active" id="home-tab">
+                <div class="banner">
+                    <img src="https://placehold.co/1200x300/2c3e50/ffffff?text=AI+Server+-+本地AI服务管理平台" alt="AI Server Banner">
+                </div>
+                
+                <div class="modules-grid">
+                    <div class="module-card" data-module="dify">
+                        <div class="module-header">
+                            <h3>Dify</h3>
+                            <span class="status-badge status-running">运行中</span>
+                        </div>
+                        <div class="module-info">
+                            <p>端口: 18600</p>
+                            <p>状态: 已启动</p>
+                        </div>
+                        <div class="module-actions">
+                            <button class="btn btn-stop">停止</button>
+                            <button class="btn btn-settings">设置</button>
+                        </div>
+                    </div>
+                    
+                    <div class="module-card" data-module="n8n">
+                        <div class="module-header">
+                            <h3>n8n</h3>
+                            <span class="status-badge status-stopped">已停止</span>
+                        </div>
+                        <div class="module-info">
+                            <p>端口: 18601</p>
+                            <p>状态: 未启动</p>
+                        </div>
+                        <div class="module-actions">
+                            <button class="btn btn-start">启动</button>
+                            <button class="btn btn-settings">设置</button>
+                        </div>
+                    </div>
+                    
+                    <div class="module-card" data-module="ragflow">
+                        <div class="module-header">
+                            <h3>RAGFlow</h3>
+                            <span class="status-badge status-running">运行中</span>
+                        </div>
+                        <div class="module-info">
+                            <p>端口: 18602</p>
+                            <p>状态: 已启动</p>
+                        </div>
+                        <div class="module-actions">
+                            <button class="btn btn-stop">停止</button>
+                            <button class="btn btn-settings">设置</button>
+                        </div>
+                    </div>
+                    
+                    <div class="module-card" data-module="oneapi">
+                        <div class="module-header">
+                            <h3>OneAPI</h3>
+                            <span class="status-badge status-stopped">已停止</span>
+                        </div>
+                        <div class="module-info">
+                            <p>端口: 18603</p>
+                            <p>状态: 未启动</p>
+                        </div>
+                        <div class="module-actions">
+                            <button class="btn btn-start">启动</button>
+                            <button class="btn btn-settings">设置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dify 设置页面 -->
+            <div class="tab-content" id="dify-tab">
+                <div class="page-header">
+                    <h2>Dify 设置</h2>
+                </div>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label for="dify-port">端口</label>
+                        <input type="number" id="dify-port" value="18600">
+                    </div>
+                    <div class="form-group">
+                        <label for="dify-host">主机地址</label>
+                        <input type="text" id="dify-host" value="localhost">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="dify-auto-start" checked> 启动时自动启动
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary">保存设置</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- n8n 设置页面 -->
+            <div class="tab-content" id="n8n-tab">
+                <div class="page-header">
+                    <h2>n8n 设置</h2>
+                </div>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label for="n8n-port">端口</label>
+                        <input type="number" id="n8n-port" value="18601">
+                    </div>
+                    <div class="form-group">
+                        <label for="n8n-host">主机地址</label>
+                        <input type="text" id="n8n-host" value="localhost">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="n8n-auto-start"> 启动时自动启动
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary">保存设置</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RAGFlow 设置页面 -->
+            <div class="tab-content" id="ragflow-tab">
+                <div class="page-header">
+                    <h2>RAGFlow 设置</h2>
+                </div>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label for="ragflow-port">端口</label>
+                        <input type="number" id="ragflow-port" value="18602">
+                    </div>
+                    <div class="form-group">
+                        <label for="ragflow-host">主机地址</label>
+                        <input type="text" id="ragflow-host" value="localhost">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="ragflow-auto-start" checked> 启动时自动启动
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary">保存设置</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OneAPI 设置页面 -->
+            <div class="tab-content" id="oneapi-tab">
+                <div class="page-header">
+                    <h2>OneAPI 设置</h2>
+                </div>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label for="oneapi-port">端口</label>
+                        <input type="number" id="oneapi-port" value="18603">
+                    </div>
+                    <div class="form-group">
+                        <label for="oneapi-host">主机地址</label>
+                        <input type="text" id="oneapi-host" value="localhost">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="oneapi-auto-start"> 启动时自动启动
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary">保存设置</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统设置页面 -->
+            <div class="tab-content" id="settings-tab">
+                <div class="page-header">
+                    <h2>系统设置</h2>
+                </div>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-start-system" checked> 随系统启动
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-start-modules"> 启动程序后自动启动模块
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="theme-selector">界面风格</label>
+                        <select id="theme-selector">
+                            <option value="dark">深色主题</option>
+                            <option value="light" selected>浅色主题</option>
+                            <option value="auto">自动</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary">保存设置</button>
+                        <button class="btn btn-secondary">重置</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

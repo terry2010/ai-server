@@ -1,0 +1,33 @@
+:root {
+  --primary: #1890ff;
+  --primary-2: #40a9ff;
+  --primary-3: #69c0ff;
+  --warning: #fa8c16;
+  --error: #ff4d4f;
+}
+
+.tab-item {
+  padding: 12px 24px;
+  border-radius: 8px 8px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+.tab-item.active {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+.menu-item { padding: 16px 24px; border-radius: 8px; margin: 4px 12px; cursor: pointer; transition: all 0.3s ease; }
+.menu-item:hover { background: linear-gradient(90deg, #e6f7ff 0%, #bae7ff 100%); transform: translateX(4px); }
+.menu-item.active { background: linear-gradient(90deg, #1890ff 0%, #40a9ff 100%); color: #ffffff; box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3); }
+
+.service-card { background:#fff; border-radius:12px; padding:24px; box-shadow:0 4px 16px rgba(0,0,0,0.08); border:1px solid #f0f0f0; transition: all .3s ease; }
+.service-card:hover { transform: translateY(-4px); box-shadow:0 8px 24px rgba(24,144,255,.15); border-color:#40a9ff; }
+.service-card.running { border-left: 4px solid #1890ff; }
+.service-card.stopped { border-left: 4px solid #8c8c8c; }
+.service-card.error { border-left: 4px solid #ff4d4f; }
+
+.status-indicator { width:12px; height:12px; border-radius:50%; animation: pulse 2s infinite; }
+.status-indicator.running { background:#1890ff; box-shadow:0 0 8px rgba(24,144,255,.6); }
+@keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.2)} 100%{transform:scale(1)} }

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-page-module="oneapi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OneAPI 设置 - AI Server 启动器</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand"><span class="dot"></span><span class="title">AI Server 启动器</span></div>
+    <nav class="tabs">
+      <a class="tab" href="index.html">开始</a>
+      <a class="tab" href="settings.html">系统设置</a>
+      <a class="tab" href="dify.html">dify <span class="badge" data-module-badge="dify"><span class="dot-status"></span><span class="label">-</span></span></a>
+      <a class="tab" href="n8n.html">n8n <span class="badge" data-module-badge="n8n"><span class="dot-status"></span><span class="label">-</span></span></a>
+      <a class="tab" href="ragflow.html">ragflow <span class="badge" data-module-badge="ragflow"><span class="dot-status"></span><span class="label">-</span></span></a>
+      <a class="tab" href="oneapi.html">oneapi <span class="badge" data-module-badge="oneapi"><span class="dot-status"></span><span class="label">-</span></span></a>
+    </nav>
+    <div class="header-actions">
+      <button class="btn ghost theme-toggle" data-action="toggle-theme">主题：自动</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="grid">
+      <div class="card span-6">
+        <div class="card-header"><div class="card-title">OneAPI 设置</div>
+          <div class="status-chip" data-status-text>未启动</div>
+        </div>
+        <div class="card-body">
+          <div class="kv">
+            <div class="key">端口</div>
+            <div class="val"><input class="input" type="number" id="port" min="1" max="65535" placeholder="3001" /></div>
+          </div>
+          <small class="hint">注意：实际端口以后端或主进程配置为准，此处为 UI 配置演示。</small>
+        </div>
+        <div class="card-footer">
+          <button class="btn" id="btn-start">启动</button>
+          <button class="btn warn" id="btn-stop">停止</button>
+          <button class="btn secondary" id="btn-save">保存</button>
+        </div>
+      </div>
+    </section>
+    <p class="footer">© 2025 AI Server · OneAPI</p>
+  </main>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
