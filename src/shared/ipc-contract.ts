@@ -53,6 +53,7 @@ export const IPC = {
   ConfigGet: 'ai/config/get',
   ConfigSet: 'ai/config/set',
   ModuleLogEvent: 'ai/module/log',
+  ModuleStatusEvent: 'ai/module/statusEvent',
   WindowMinimize: 'ai/window/minimize',
   WindowMaximize: 'ai/window/maximize',
   WindowClose: 'ai/window/close',

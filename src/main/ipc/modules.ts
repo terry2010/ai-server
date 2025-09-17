@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 import { IPC, type ModuleName } from '../../shared/ipc-contract';
 import { listModules, startModule, stopModule, getModuleStatus, clearModuleCache, firstStartModule, startModuleStream, stopModuleStream, firstStartModuleStream } from '../docker/modules';
 import { getModuleLogs } from '../docker/index';
@@ -6,7 +6,13 @@ import { getModuleLogs } from '../docker/index';
 ipcMain.handle(IPC.ModulesList, async () => ({ success: true, data: { items: listModules() } }));
 
 ipcMain.handle(IPC.ModuleStart, async (_e, payload: { name: ModuleName }) => {
-  return startModule(payload.name);
+  const res = await startModule(payload.name);
+  try {
+    const status = await getModuleStatus(payload.name)
+    const wins = BrowserWindow.getAllWindows()
+    for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+  } catch {}
+  return res;
 });
 
 ipcMain.handle(IPC.ModuleStartStream, async (e, payload: { name: ModuleName; streamId: string }) => {
@@ -14,7 +20,13 @@ ipcMain.handle(IPC.ModuleStartStream, async (e, payload: { name: ModuleName; str
 });
 
 ipcMain.handle(IPC.ModuleFirstStart, async (_e, payload: { name: ModuleName }) => {
-  return firstStartModule(payload.name);
+  const res = await firstStartModule(payload.name);
+  try {
+    const status = await getModuleStatus(payload.name)
+    const wins = BrowserWindow.getAllWindows()
+    for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+  } catch {}
+  return res;
 });
 
 ipcMain.handle(IPC.ModuleFirstStartStream, async (e, payload: { name: ModuleName; streamId: string }) => {
@@ -22,7 +34,13 @@ ipcMain.handle(IPC.ModuleFirstStartStream, async (e, payload: { name: ModuleName
 });
 
 ipcMain.handle(IPC.ModuleStop, async (_e, payload: { name: ModuleName }) => {
-  return stopModule(payload.name);
+  const res = await stopModule(payload.name);
+  try {
+    const status = await getModuleStatus(payload.name)
+    const wins = BrowserWindow.getAllWindows()
+    for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+  } catch {}
+  return res;
 });
 
 ipcMain.handle(IPC.ModuleStopStream, async (e, payload: { name: ModuleName; streamId: string }) => {

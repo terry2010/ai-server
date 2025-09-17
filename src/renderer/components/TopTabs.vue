@@ -79,7 +79,7 @@
             </a-menu-item>
           </a-menu>
         </template>
-        <div class="user-info">
+        <div class="user-info" @mouseenter="showMenu = false">
           <a-avatar size="small" :src="userInfo.avatar">
             {{ userInfo.name.charAt(0) }}
           </a-avatar>
@@ -90,19 +90,17 @@
       
       <!-- Windows 窗口控制按钮 -->
       <div class="windows-controls">
-        <a-dropdown trigger="['click']" placement="bottomLeft" :mouseEnterDelay="0" :mouseLeaveDelay="0">
-          <template #overlay>
-            <a-menu>
-              <a-menu-item key="k1">示例菜单项一</a-menu-item>
-              <a-menu-item key="k2">示例菜单项二</a-menu-item>
-              <a-menu-divider />
-              <a-menu-item key="k3">关于 AI-Server</a-menu-item>
-            </a-menu>
-          </template>
-          <div class="windows-button menu hit-area" title="菜单">
+        <div class="menu-wrapper">
+          <div class="windows-button menu hit-area" title="菜单" @click="toggleMenu" ref="menuBtn">
             <menu-outlined />
           </div>
-        </a-dropdown>
+          <div v-if="showMenu" class="custom-menu" @click.stop>
+            <div class="custom-menu-item">示例菜单项一</div>
+            <div class="custom-menu-item">示例菜单项二</div>
+            <div class="custom-menu-divider"></div>
+            <div class="custom-menu-item">关于 AI-Server</div>
+          </div>
+        </div>
         <div class="windows-button minimize hit-area" @click="handleMinimize" title="最小化">
           <minus-outlined />
         </div>
@@ -118,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { moduleStore } from '../stores/modules'
 import { windowMinimize, windowMaximize, windowClose } from '../services/ipc'
@@ -137,6 +135,8 @@ import {
 const router = useRouter()
 const route = useRoute()
 const activeTab = ref('home')
+const showMenu = ref(false)
+const menuBtn = ref<HTMLElement | null>(null)
 
 // 模拟用户信息
 const userInfo = ref({
@@ -166,6 +166,22 @@ function syncTabWithRoute() {
 
 onMounted(syncTabWithRoute)
 watch(() => route.name, syncTabWithRoute)
+
+function toggleMenu() {
+  showMenu.value = !showMenu.value
+}
+
+function onDocClick(e: MouseEvent) {
+  const t = e.target as Node
+  if (!menuBtn.value) { showMenu.value = false; return }
+  if (menuBtn.value.contains(t)) return
+  const menuEl = document.querySelector('.custom-menu')
+  if (menuEl && menuEl.contains(t)) return
+  showMenu.value = false
+}
+
+onMounted(() => document.addEventListener('click', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 const handleUserMenuClick = ({ key }: { key: string }) => {
   switch (key) {
@@ -255,15 +271,33 @@ const handleMenu = () => { /* 示例菜单通过 a-dropdown 在右侧 user-secti
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
 
+.mac-controls { display: flex !important; align-items: center; gap: 8px; padding-left: 8px; visibility: visible; }
+.mac-button { width: 12px; height: 12px; border-radius: 50%; background-color: #d9d9d9; position: relative; }
+.mac-button.close { background-color: #ff5f57; }
+.mac-button.minimize { background-color: #ffbd2e; }
+.mac-button.maximize { background-color: #28ca42; }
+/* 取消 hover 背景矩形，保持原生风格（不添加任何 :hover 背景） */
+.mac-button:hover::after { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -52%); color: rgba(0,0,0,0.65); font-size: 10px; font-weight: 700; }
+.mac-button.close:hover::after { content: '×'; }
 .mac-button.minimize:hover::after { content: '−'; }
 .mac-button.maximize:hover::after { content: '+'; }
 
 /* Windows 窗口控制按钮 */
-.windows-controls { display: flex; align-items: center; margin-left: var(--spacing-md); }
+.windows-controls { display: flex; align-items: center; gap: 0; margin-right: 0; }
+.hit-area { padding: 8px 12px; border-radius: 0; }
+.hit-area:hover { background: var(--bg-tertiary); }
+.windows-button.close.hit-area { margin-right: -8px; }
 .windows-button { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition-base); color: var(--text-secondary); font-size: 14px; }
 .windows-button:hover { background-color: var(--bg-tertiary); color: var(--text-primary); }
 .windows-button.close:hover { background-color: #e81123; color: white; }
 .windows-button.maximize:hover,
 .windows-button.minimize:hover { background-color: var(--bg-tertiary); }
 .windows-button.menu:hover { background-color: var(--primary-color); color: white; }
+
+/* 自定义菜单：无动画，出现在菜单按钮的左下方，距离更近 */
+.menu-wrapper { position: relative; }
+.custom-menu { position: absolute; right: 100%; top: calc(100% + 14px); transform: translateX(33px); background: #fff; border: 1px solid var(--border-light); border-radius: 8px; box-shadow: var(--shadow-lg); min-width: 180px; z-index: 9999; }
+.custom-menu-item { padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+.custom-menu-item:hover { background: var(--bg-tertiary); }
+.custom-menu-divider { height: 1px; background: var(--border-light); margin: 4px 0; }
 </style>

@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import CarouselBanner from '../components/CarouselBanner.vue'
 import OverviewCard from '../components/OverviewCard.vue'
 import ServiceCard from '../components/ServiceCard.vue'
-import { listModules, getModuleStatus } from '../services/ipc'
+import { listModules, getModuleStatus, dockerCheck } from '../services/ipc'
+import { IPC } from '../../shared/ipc-contract'
 import { moduleStore } from '../stores/modules'
 
 type ServiceType = 'n8n' | 'dify' | 'oneapi' | 'ragflow'
 type Card = { serviceName: string; serviceDescription: string; serviceType: ServiceType; status: 'running'|'stopped'|'error'|'loading'; cpuUsage: number; memoryUsage: number; port: string; uptime: string }
+
+function normalizeServices(arr: Card[]): Card[] {
+  // 以 serviceType 去重，只保留最后一次
+  const map = new Map<ServiceType, Card>()
+  for (const item of arr) {
+    const t = item.serviceType
+    if (!order.includes(t)) continue
+    map.set(t, {
+      ...item,
+      serviceName: t === 'dify' ? 'Dify' : t === 'oneapi' ? 'OneAPI' : t === 'ragflow' ? 'RagFlow' : 'n8n',
+      serviceDescription: descriptionMap[t] || ''
+    })
+  }
+  // 按固定顺序输出
+  return order.filter(t => map.has(t)).map(t => map.get(t)!)
+}
 
 const descriptionMap: Record<ServiceType, string> = {
   n8n: '工作流自动化平台，用于连接各种应用和服务',
@@ -19,7 +37,35 @@ const descriptionMap: Record<ServiceType, string> = {
 const order: ServiceType[] = ['n8n', 'dify', 'oneapi', 'ragflow']
 
 const services = ref<Card[]>([])
+const isRefreshing = ref(false)
 let timer: number | undefined
+const CACHE_KEY = 'moduleStatusCache.v1'
+const CACHE_TTL_MS = 2 * 60 * 1000
+
+function saveCache(cards: Card[]) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: cards })) } catch {}
+}
+
+function loadCache(): Card[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const obj = JSON.parse(raw)
+    if (obj && Array.isArray(obj.items) && typeof obj.ts === 'number') {
+      if (Date.now() - obj.ts <= CACHE_TTL_MS) {
+        // 兜底：老缓存可能缺少 serviceDescription，这里补齐
+        const fixed = (obj.items as any[]).map((it) => ({
+          ...it,
+          serviceType: it.serviceType as ServiceType,
+          serviceName: it.serviceType === 'dify' ? 'Dify' : it.serviceType === 'oneapi' ? 'OneAPI' : it.serviceType === 'ragflow' ? 'RagFlow' : 'n8n',
+          serviceDescription: descriptionMap[it.serviceType as ServiceType] || ''
+        }))
+        return fixed as Card[]
+      }
+    }
+  } catch {}
+  return null
+}
 
 function extractFirstHostPort(portsRecord: Record<string, string>): string {
   // 从 docker ps 的 Ports 字符串中解析第一个本地端口  (示例: "0.0.0.0:15432->5432/tcp, :::15432->5432/tcp")
@@ -67,38 +113,163 @@ async function refreshStatus() {
       }
       return card
     }))
-    // 按预设顺序排序
-    services.value = order
-      .filter(n => full.some(f => f.serviceType === n))
-      .map(n => full.find(f => f.serviceType === n)!)
-    // 更新全局模块状态点与计数
-    moduleStore.total = full.length
-    moduleStore.running = full.filter(f => f.status === 'running').length
-    for (const f of full) moduleStore.dots[f.serviceType] = f.status as any
+    // 按预设顺序去重排序
+    services.value = normalizeServices(full)
+    // 更新全局模块状态点与计数（基于规范化后的列表）
+    moduleStore.total = services.value.length
+    moduleStore.running = services.value.filter(f => f.status === 'running').length
+    for (const f of services.value) moduleStore.dots[f.serviceType] = f.status as any
+    // 写入缓存
+    saveCache(services.value)
   } catch (e) {
     // 静默，首页可继续展示已有数据
     console.warn('refreshStatus error', e)
+  } finally {
+    ;(refreshStatus as any)._busy = false
   }
 }
 
+const route = useRoute()
+
 onMounted(async () => {
+  // 1) 先用缓存渲染，避免每次进入首页都长时间 loading
+  let usedCache = false
+  try {
+    // 先立即尝试渲染缓存，不等待任何异步
+    const cached0 = loadCache()
+    if (cached0 && cached0.length) {
+      services.value = normalizeServices(cached0)
+      // 同步圆点与计数
+      moduleStore.total = services.value.length
+      moduleStore.running = services.value.filter(f => f.status === 'running').length
+      for (const f of services.value) moduleStore.dots[f.serviceType] = f.status as any
+      usedCache = true
+    }
+    const dk = await dockerCheck()
+    const cached = loadCache()
+    if (dk.running && cached && cached.length && !usedCache) {
+      services.value = normalizeServices(cached)
+      moduleStore.total = services.value.length
+      moduleStore.running = services.value.filter(f => f.status === 'running').length
+      for (const f of services.value) moduleStore.dots[f.serviceType] = f.status as any
+      usedCache = true
+    }
+    if (!dk.running && !usedCache) {
+      // Docker 未运行且没有可用缓存：渲染“全部 stopped”的占位，避免显示旧数据
+      const list = await listModules()
+      const place = list.map((m) => ({
+        serviceName: (m.name as ServiceType) === 'dify' ? 'Dify' : (m.name as ServiceType) === 'oneapi' ? 'OneAPI' : (m.name as ServiceType) === 'ragflow' ? 'RagFlow' : 'n8n',
+        serviceDescription: descriptionMap[m.name as ServiceType] || '',
+        serviceType: m.name as ServiceType,
+        status: 'stopped' as 'stopped',
+        cpuUsage: 0,
+        memoryUsage: 0,
+        port: '',
+        uptime: ''
+      }))
+      services.value = normalizeServices(place)
+      moduleStore.total = services.value.length
+      moduleStore.running = 0
+      for (const f of services.value) moduleStore.dots[f.serviceType] = 'stopped' as any
+    }
+  } catch {}
+
+  // 2) 订阅事件驱动更新（主进程在 start/stop 成功后会广播）
+  try {
+    const onStatus = (_e: any, payload: any) => {
+      const name = String(payload?.name || '').toLowerCase() as ServiceType
+      const resp = payload?.status
+      if (!name || !resp?.success) return
+      const st = resp.data as any
+      const idx = services.value.findIndex(s => s.serviceType === name)
+      const port = extractFirstHostPort(st.ports || {})
+      const status = (st.status === 'parse_error' ? 'error' : st.status) as 'running'|'stopped'|'error'
+      const card: Card = {
+        serviceName: name === 'dify' ? 'Dify' : name === 'oneapi' ? 'OneAPI' : name === 'ragflow' ? 'RagFlow' : 'n8n',
+        serviceDescription: descriptionMap[name],
+        serviceType: name,
+        status,
+        cpuUsage: 0,
+        memoryUsage: 0,
+        port: port || '',
+        uptime: ''
+      }
+      if (idx >= 0) services.value[idx] = card
+      else services.value = normalizeServices([...services.value, card])
+      // 重新规范化，防止重复，并更新圆点与计数、缓存
+      services.value = normalizeServices(services.value)
+      moduleStore.total = services.value.length
+      moduleStore.running = services.value.filter(f => f.status === 'running').length
+      for (const f of services.value) moduleStore.dots[f.serviceType] = f.status as any
+      saveCache(services.value)
+    }
+    ;(window as any).api.on(IPC.ModuleStatusEvent, onStatus)
+    // 组件卸载时清理监听，避免 MaxListenersExceededWarning
+    onUnmounted(() => {
+      try {
+        (window as any).api.off?.(IPC.ModuleStatusEvent, onStatus)
+        ;(window as any).api.removeListener?.(IPC.ModuleStatusEvent, onStatus)
+      } catch {}
+    })
+  } catch {}
+
+  // 3) 再拉一次最新状态覆盖
   await refreshStatus()
-  timer = window.setInterval(refreshStatus, 8000)
+  // 首页常驻时改为 60s 轮询；非首页暂停
+  // 初始定时器：根据当前路由决定频率
+  const setTimer = () => {
+    if (timer) { window.clearInterval(timer); timer = undefined as any }
+    const isHome = ((route.name as string) || '').toLowerCase() === 'home'
+    const interval = isHome ? 8000 : 60000
+    timer = window.setInterval(() => {
+      const nowIsHome = ((route.name as string) || '').toLowerCase() === 'home'
+      if (nowIsHome) refreshStatus()
+    }, interval)
+  }
+  setTimer()
+  // 页面获得焦点/可见时，如果当前在首页，立即刷新一次，加速对命令行操作的反馈
+  const onFast = () => {
+    const isHome = ((route.name as string) || '').toLowerCase() === 'home'
+    if (isHome) refreshStatus()
+  }
+  window.addEventListener('focus', onFast)
+  document.addEventListener('visibilitychange', onFast)
+  onUnmounted(() => {
+    window.removeEventListener('focus', onFast)
+    document.removeEventListener('visibilitychange', onFast)
+  })
+  // 监听路由变化，动态调整频率
+  watch(() => route.name, () => setTimer())
 })
 
 onUnmounted(() => { if (timer) window.clearInterval(timer) })
+
+async function handleRefresh() {
+  try {
+    isRefreshing.value = true
+    // 所有模块先进入 loading
+    services.value = services.value.map(s => ({
+      ...s,
+      serviceDescription: s.serviceDescription || descriptionMap[s.serviceType],
+      status: 'loading'
+    }))
+    await refreshStatus()
+  } finally {
+    isRefreshing.value = false
+  }
+}
 </script>
 
 <template>
   <div class="home-view">
     <CarouselBanner />
-    <OverviewCard @refresh="refreshStatus" />
+    <OverviewCard :loading="isRefreshing" @refresh="handleRefresh" />
     
     <div class="services-section">
       <div class="services-grid">
         <ServiceCard
           v-for="service in services"
-          :key="service.serviceName"
+          :key="service.serviceType"
           :service-name="service.serviceName"
           :service-description="service.serviceDescription"
           :service-type="service.serviceType"

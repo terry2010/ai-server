@@ -320,10 +320,26 @@ export async function clearModuleCache(name: ModuleName): Promise<IpcResponse> {
 export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<ModuleStatus>> {
   // 返回模块（可能由多个服务组成）的聚合状态与端口
   try {
+    // 短期内存缓存，降低频繁刷新造成的 CLI 压力
+    const now = Date.now();
+    const cacheKey = `status:${name}`;
+    const hit = (statusCache as any)[cacheKey] as { ts: number; val: IpcResponse<ModuleStatus> } | undefined;
+    if (hit && now - hit.ts < 1500) {
+      return hit.val;
+    }
+
     const reg = loadRegistry();
     const mods = reg.modules || [];
     const self = mods.find(m => m.name === name);
     if (!self) return { success: false, code: 'E_RUNTIME', message: `模块未注册: ${name}` };
+
+    // 若 Docker 未运行，直接返回 stopped，避免 docker ps/inspect 报错卡顿
+    const runningDocker = await dockerRunning();
+    if (!runningDocker) {
+      const val: IpcResponse<ModuleStatus> = { success: true, data: { running: false, status: 'stopped', ports: {}, usedBy: self.type === 'basic' ? [] : undefined } };
+      (statusCache as any)[cacheKey] = { ts: now, val };
+      return val;
+    }
 
     // 收集需要检查的容器名
     const services = self.type === 'feature' ? servicesForModule(name) : [name];
@@ -335,21 +351,42 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
     const ports: Record<string, string> = {};
     const states: string[] = [];
 
+    // 端口收集：从 docker ps 的列表里匹配
     for (const cname of containers) {
-      // 端口（仅当容器在运行集中时才有）
       const match = lines.find(l => l.startsWith(cname + '|'));
       if (match) {
         const parts = match.split('|');
         const portStr = parts[1] || '';
         if (portStr) ports[cname] = portStr;
       }
-      // 精确状态
-      let state = 'stopped';
-      try {
-        const { stdout: s2 } = await run(`docker inspect -f "{{.State.Status}}" ${cname}`);
-        state = (s2.trim() || 'stopped').toLowerCase();
-      } catch {}
-      states.push(state);
+    }
+
+    // 批量 inspect 获取精确状态，避免每个容器单独调用
+    try {
+      if (containers.length > 0) {
+        const cmd = `docker inspect -f "{{.Name}}|{{.State.Status}}" ${containers.join(' ')}`;
+        const { stdout: s2 } = await run(cmd);
+        const mapState: Record<string, string> = {};
+        s2.trim().split(/\r?\n/).forEach(line => {
+          const [rawName, st] = line.split('|');
+          if (!rawName) return;
+          const cname = rawName.replace(/^\//, '');
+          mapState[cname] = (st || 'stopped').trim().toLowerCase();
+        });
+        for (const cname of containers) {
+          states.push(mapState[cname] || 'stopped');
+        }
+      }
+    } catch {
+      // 回退：逐个容器 inspect（极端情况下才会走到）
+      for (const cname of containers) {
+        let state = 'stopped';
+        try {
+          const { stdout: s3 } = await run(`docker inspect -f "{{.State.Status}}" ${cname}`);
+          state = (s3.trim() || 'stopped').toLowerCase();
+        } catch {}
+        states.push(state);
+      }
     }
 
     // 计算聚合状态：
@@ -377,11 +414,16 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
       usedBy = activeUsers;
     }
 
-    return { success: true, data: { running, status, ports, usedBy } };
+    const val: IpcResponse<ModuleStatus> = { success: true, data: { running, status, ports, usedBy } };
+    (statusCache as any)[cacheKey] = { ts: now, val };
+    return val;
   } catch (e: any) {
     return { success: false, code: 'E_RUNTIME', message: String(e?.message ?? e) };
   }
 }
+
+// 简易内存缓存容器（仅当前进程存活期间有效）
+const statusCache: Record<string, { ts: number; val: IpcResponse<ModuleStatus> }> = {};
 
 // waitHealth 已迁移至 ./health
 
