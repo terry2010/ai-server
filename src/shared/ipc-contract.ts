@@ -53,6 +53,8 @@ export const IPC = {
   BVSetInsets: 'ai/bv/setInsets',
   BVGoBack: 'ai/bv/goBack',
   BVGoForward: 'ai/bv/goForward',
+  BVLoadUrl: 'ai/bv/loadUrl',
+  BVLoadHome: 'ai/bv/loadHome',
   OpenExternal: 'ai/system/openExternal',
   ModulesList: 'ai/modules/list',
   ModuleStart: 'ai/module/start',

@@ -125,6 +125,11 @@ export async function openExternal(url: string): Promise<void> {
   if (!res?.success) throw new Error(res?.message || '调用系统浏览器失败')
 }
 
+export async function bvLoadHome(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVLoadHome, { name })
+  if (!res?.success) throw new Error(res?.message || '加载模块首页失败')
+}
+
 // Docker 状态/启动
 export async function dockerCheck(): Promise<{ installed: boolean; running: boolean }> {
   const res = await invoke(IPC.DockerCheck)

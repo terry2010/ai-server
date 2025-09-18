@@ -112,6 +112,22 @@ class BrowserViewManager {
     try { if (v && v.webContents.canGoForward()) v.webContents.goForward() } catch {}
     return { success: true }
   }
+
+  async loadUrl(name: ModuleKey, url: string) {
+    const v = await this.ensureView(name)
+    try { if (url) await v.webContents.loadURL(url) } catch {}
+    return { success: true }
+  }
+
+  async loadHome(name: ModuleKey) {
+    try {
+      const st = await getModuleStatus(name as any)
+      const url = this.extractFirstHttpUrl((st as any)?.data?.ports || (st as any)?.ports || {})
+      return this.loadUrl(name, url)
+    } catch {
+      return { success: false }
+    }
+  }
 }
 
 export const BVManager = new BrowserViewManager()

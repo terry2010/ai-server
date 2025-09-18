@@ -25,3 +25,6 @@ ipcMain.handle(IPC.BVGoForward, async (_e, payload: { name: 'n8n'|'dify'|'oneapi
 ipcMain.handle(IPC.OpenExternal, async (_e, payload: { url: string }) => {
   try { await shell.openExternal(payload.url); return { success: true } } catch (e:any) { return { success: false, message: e?.message || String(e) } }
 })
+
+ipcMain.handle(IPC.BVLoadUrl, async (_e, payload: { name: 'n8n'|'dify'|'oneapi'|'ragflow'; url: string }) => BVManager.loadUrl(payload.name, payload.url))
+ipcMain.handle(IPC.BVLoadHome, async (_e, payload: { name: 'n8n'|'dify'|'oneapi'|'ragflow' }) => BVManager.loadHome(payload.name))

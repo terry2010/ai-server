@@ -356,6 +356,7 @@ function resetTabOrder() {
   height: 40px;
   position: relative;
   z-index: 1000;
+  -webkit-app-region: drag; /* 允许在空白处拖动窗口 */
 }
 
 .app-logo {
@@ -385,7 +386,7 @@ function resetTabOrder() {
 
 .tabs-container { flex: 1; position: relative; z-index: 1500; }
 
-.user-section { margin-left: var(--spacing-lg); display: flex; align-items: center; gap: var(--spacing-lg); }
+.user-section { margin-left: var(--spacing-lg); display: flex; align-items: center; gap: var(--spacing-lg); -webkit-app-region: no-drag; }
 .user-info { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition-base); background: rgba(0, 0, 0, 0.02); border: 1px solid var(--border-light); }
 .user-info:hover { background: var(--bg-tertiary); box-shadow: var(--shadow-sm); }
 .user-name { font-size: var(--text-sm); font-weight: 500; color: var(--text-primary); }
@@ -395,7 +396,7 @@ function resetTabOrder() {
 .custom-tabs :deep(.ant-tabs-nav) { margin: 0; background: transparent; }
 .custom-tabs :deep(.ant-tabs-nav-wrap),
 .custom-tabs :deep(.ant-tabs-nav-list) { overflow: visible; }
-.custom-tabs :deep(.ant-tabs-tab) { background: transparent; border: none; border-radius: 0 0 12px 12px !important; margin-right: 8px; padding: 8px 20px; color: var(--text-secondary); font-weight: 600; transition: all var(--transition-base); position: relative; overflow: visible; min-width: 110px; justify-content: center; background-clip: padding-box; }
+.custom-tabs :deep(.ant-tabs-tab) { background: transparent; border: none; border-radius: 0 0 12px 12px !important; margin-right: 8px; padding: 8px 20px; color: var(--text-secondary); font-weight: 600; transition: all var(--transition-base); position: relative; overflow: visible; min-width: 110px; justify-content: center; background-clip: padding-box; -webkit-app-region: no-drag; }
 .custom-tabs :deep(.ant-tabs-tab::before) { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, transparent 0%, rgba(0, 122, 255, 0.05) 100%); opacity: 0; transition: opacity var(--transition-base); border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; }
 .custom-tabs :deep(.ant-tabs-tab:hover) { background: var(--bg-tertiary); color: var(--text-primary); }
 .custom-tabs :deep(.ant-tabs-tab:hover .ant-tabs-tab-btn) { color: var(--text-primary) !important; }
@@ -405,7 +406,7 @@ function resetTabOrder() {
 .custom-tabs :deep(.ant-tabs-tab-active:hover .ant-tabs-tab-btn) { color: var(--text-primary) !important; }
 .custom-tabs :deep(.ant-tabs-ink-bar) { display: none; }
 
-.tab-content { display: flex; align-items: center; gap: var(--spacing-sm); }
+.tab-content { display: flex; align-items: center; gap: var(--spacing-sm); -webkit-app-region: no-drag; }
 .tab-content[draggable="true"] { cursor: grab; user-select: none; }
 .tab-content.drag-over { outline: 2px dashed rgba(0,0,0,0.2); border-radius: 8px; }
 .status-indicator { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
@@ -416,7 +417,7 @@ function resetTabOrder() {
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
 
-.mac-controls { display: flex; align-items: center; gap: 8px; padding-left: 8px; visibility: visible; }
+.mac-controls { display: flex; align-items: center; gap: 8px; padding-left: 8px; visibility: visible; -webkit-app-region: no-drag; }
 .mac-button { width: 12px; height: 12px; border-radius: 50%; background-color: #d9d9d9; position: relative; }
 .mac-button.close { background-color: #ff5f57; }
 .mac-button.minimize { background-color: #ffbd2e; }
@@ -431,7 +432,7 @@ function resetTabOrder() {
 .mac-button.maximize:hover::after { content: '+'; }
 
 /* Windows 窗口控制按钮 */
-.windows-controls { display: flex; align-items: center; gap: 0; margin-right: 0; }
+.windows-controls { display: flex; align-items: center; gap: 4px; padding-right: 8px; -webkit-app-region: no-drag; }
 .hit-area { padding: 6px 8px; border-radius: 0; }
 .hit-area:hover { background: var(--bg-tertiary); }
 .windows-button.close.hit-area { margin-right: -6px; }

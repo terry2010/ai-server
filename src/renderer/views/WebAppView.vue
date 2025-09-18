@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getModuleStatus, bvRefresh, bvGoBack, bvGoForward, openExternal, bvSetInsets } from '../services/ipc'
+import { getModuleStatus, bvRefresh, bvGoBack, bvGoForward, openExternal, bvSetInsets, bvLoadHome } from '../services/ipc'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,7 +64,10 @@ async function goForward() {
   const name = String(route.name || '').toLowerCase() as any
   await bvGoForward(name)
 }
-function goHome() { router.push('/') }
+async function goHome() {
+  const name = String(route.name || '').toLowerCase() as any
+  await bvLoadHome(name)
+}
 
 async function openInBrowser() {
   if (url.value) await openExternal(url.value)
