@@ -50,6 +50,8 @@ export const IPC = {
   ModuleStatus: 'ai/module/status',
   ModuleClear: 'ai/module/clear',
   ModuleLogs: 'ai/module/logs',
+  ModuleLogsAttach: 'ai/module/logsAttach',
+  ModuleLogsDetach: 'ai/module/logsDetach',
   ConfigGet: 'ai/config/get',
   ConfigSet: 'ai/config/set',
   ModuleLogEvent: 'ai/module/log',

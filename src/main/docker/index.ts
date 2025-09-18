@@ -16,15 +16,29 @@ import { composeUp, composeStop, composeUpStream, composeStopStream, startContai
 type LogEntry = { cmd: string; stdout?: string; stderr?: string };
 export interface AppLogEntry { id: string; timestamp: string; service: string; module: string; moduleType: ModuleType; level: 'error'|'warn'|'info'|'debug'|'log'; message: string }
 
+// 创建 dockerode 客户端（跨平台支持 Windows 命名管道与 *nix 套接字）
+function getDocker(): any | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Docker = require('dockerode');
+    const isWin = process.platform === 'win32';
+    return isWin ? new Docker({ socketPath: '//./pipe/docker_engine' }) : new Docker({ socketPath: '/var/run/docker.sock' });
+  } catch {
+    return null;
+  }
+}
+
 async function execAndLog(cmd: string, logs: LogEntry[], cwd?: string) {
   const r = await run(cmd, cwd);
   logs.push({ cmd, stdout: r.stdout, stderr: r.stderr });
   return r;
 }
 
-// 读取模块相关容器的最近日志（聚合返回）
+// 读取模块相关容器的最近日志（聚合返回）——使用 dockerode
 export async function getModuleLogs(name?: ModuleName, tail: number = 200): Promise<IpcResponse<{ entries: AppLogEntry[] }>> {
   try {
+    const docker = getDocker();
+    if (!docker) return { success: false, code: 'E_RUNTIME', message: 'dockerode 不可用' };
     const reg = loadRegistry();
     const mods = reg.modules || [];
     let targets: string[] = [];
@@ -34,28 +48,28 @@ export async function getModuleLogs(name?: ModuleName, tail: number = 200): Prom
       const services = self.type === 'feature' ? servicesForModule(name) : [name];
       targets = services.map(s => containerNameFor(s));
     } else {
-      // 未指定模块时，列出所有已注册模块的容器名
-      targets = mods.flatMap((m: any) => (m.type === 'feature' ? servicesForModule(m.name as ModuleName) : [m.name])).map(s => containerNameFor(s as any));
+      targets = mods
+        .flatMap((m: any) => (m.type === 'feature' ? servicesForModule(m.name as ModuleName) : [m.name]))
+        .map(s => containerNameFor(s as any));
     }
     const entries: AppLogEntry[] = [];
     for (const cname of targets) {
       try {
-        const { stdout } = await run(`docker logs --tail ${tail} --timestamps ${cname}`);
-        const lines = stdout.split(/\r?\n/).filter(Boolean);
+        const container = docker.getContainer(cname);
+        const buf: Buffer = await container.logs({ stdout: true, stderr: true, timestamps: true, tail, follow: false });
+        const text = Buffer.isBuffer(buf) ? buf.toString('utf8') : String(buf || '');
+        const lines = text.split(/\r?\n/).filter(Boolean);
         for (const line of lines) {
-          // 形如: 2025-09-16T19:22:10.123456789Z message...
           const m = line.match(/^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(.*)$/);
           const ts = m ? m[1] : new Date().toISOString();
           const msg = m ? m[2] : line;
-          // 简单等级推断
           const level: AppLogEntry['level'] = /error|ERR|\[error\]/i.test(msg) ? 'error' : /warn|\[warn\]/i.test(msg) ? 'warn' : /debug|\[debug\]/i.test(msg) ? 'debug' : /info|\[info\]/i.test(msg) ? 'info' : 'log';
-          // 反查模块名称与类型
-          let modName: string = ''
-          let modType: ModuleType = 'feature'
-          for (const m of mods) {
-            const arr = (m.type === 'feature' ? servicesForModule(m.name as ModuleName) : [m.name])
-            const names = arr.map(s => containerNameFor(s as ModuleName))
-            if (names.includes(cname)) { modName = m.name; modType = m.type; break }
+          let modName: string = '';
+          let modType: ModuleType = 'feature';
+          for (const mm of mods) {
+            const arr = (mm.type === 'feature' ? servicesForModule(mm.name as ModuleName) : [mm.name]);
+            const names = arr.map(s => containerNameFor(s as ModuleName));
+            if (names.includes(cname)) { modName = mm.name; modType = mm.type; break; }
           }
           entries.push({ id: `${cname}-${ts}-${entries.length}`, timestamp: ts, service: cname, module: modName || 'unknown', moduleType: modType, level, message: msg });
         }
@@ -63,7 +77,6 @@ export async function getModuleLogs(name?: ModuleName, tail: number = 200): Prom
         // 忽略单容器日志失败
       }
     }
-    // 按时间倒序
     entries.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
     return { success: true, data: { entries } };
   } catch (e: any) {
@@ -345,49 +358,42 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
     const services = self.type === 'feature' ? servicesForModule(name) : [name];
     const containers = services.map(s => containerNameFor(s));
 
-    // docker ps 列表用于端口映射收集
-    const { stdout } = await run('docker ps --format "{{.Names}}|{{.Ports}}"');
-    const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+    // 使用 dockerode.listContainers({all:true}) 聚合端口与状态
     const ports: Record<string, string> = {};
     const states: string[] = [];
-
-    // 端口收集：从 docker ps 的列表里匹配
-    for (const cname of containers) {
-      const match = lines.find(l => l.startsWith(cname + '|'));
-      if (match) {
-        const parts = match.split('|');
-        const portStr = parts[1] || '';
-        if (portStr) ports[cname] = portStr;
-      }
-    }
-
-    // 批量 inspect 获取精确状态，避免每个容器单独调用
     try {
-      if (containers.length > 0) {
-        const cmd = `docker inspect -f "{{.Name}}|{{.State.Status}}" ${containers.join(' ')}`;
-        const { stdout: s2 } = await run(cmd);
-        const mapState: Record<string, string> = {};
-        s2.trim().split(/\r?\n/).forEach(line => {
-          const [rawName, st] = line.split('|');
-          if (!rawName) return;
-          const cname = rawName.replace(/^\//, '');
-          mapState[cname] = (st || 'stopped').trim().toLowerCase();
-        });
+      const docker = getDocker();
+      if (docker) {
+        const listAll = await docker.listContainers({ all: true });
+        // 建立 name -> info 映射
+        const byName: Record<string, any> = {};
+        for (const it of listAll) {
+          const name = (Array.isArray(it.Names) && it.Names[0] ? String(it.Names[0]) : '').replace(/^\//, '');
+          if (!name) continue;
+          byName[name] = it;
+        }
+        // 端口映射字符串，格式与原先 "host:port->containerPort/proto" 串联接近
         for (const cname of containers) {
-          states.push(mapState[cname] || 'stopped');
+          const info = byName[cname];
+          if (!info || !Array.isArray(info.Ports)) continue;
+          const portStr = info.Ports
+            .filter((p: any) => p.PublicPort)
+            .map((p: any) => `${p.IP || '0.0.0.0'}:${p.PublicPort}->${p.PrivatePort}/${p.Type || 'tcp'}`)
+            .join(', ');
+          if (portStr) ports[cname] = portStr;
+        }
+        // 状态：优先缓存，其次取 listContainers 的 State
+        for (const cname of containers) {
+          let state = getCachedContainerState(cname);
+          if (!state) {
+            const info = byName[cname];
+            state = String(info?.State || 'stopped').toLowerCase();
+            setCachedContainerState(cname, state);
+          }
+          states.push(state || 'stopped');
         }
       }
-    } catch {
-      // 回退：逐个容器 inspect（极端情况下才会走到）
-      for (const cname of containers) {
-        let state = 'stopped';
-        try {
-          const { stdout: s3 } = await run(`docker inspect -f "{{.State.Status}}" ${cname}`);
-          state = (s3.trim() || 'stopped').toLowerCase();
-        } catch {}
-        states.push(state);
-      }
-    }
+    } catch {}
 
     // 计算聚合状态：
     // - 全部 running => running
@@ -425,6 +431,48 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
 // 简易内存缓存容器（仅当前进程存活期间有效）
 const statusCache: Record<string, { ts: number; val: IpcResponse<ModuleStatus> }> = {};
 
+// ===== 共享 CLI 结果的短期缓存（降低进程抖动） =====
+let psCache: { ts: number; lines: string[] } | null = null;
+const PS_TTL = 1000; // 1 秒
+const STATE_TTL = 1000; // 单容器状态缓存 TTL
+const containerStateCache: Record<string, { ts: number; state: string }> = {};
+
+async function getDockerPsSnapshot(): Promise<string[]> {
+  const now = Date.now();
+  if (psCache && (now - psCache.ts) < PS_TTL) return psCache.lines;
+  try {
+    const docker = getDocker();
+    if (!docker) { psCache = { ts: now, lines: [] }; return []; }
+    const list = await docker.listContainers({ all: true });
+    const lines: string[] = [];
+    for (const it of list) {
+      const name = (Array.isArray(it.Names) && it.Names[0] ? String(it.Names[0]) : '').replace(/^\//, '');
+      if (!name) continue;
+      const portStr = (it.Ports || [])
+        .filter((p: any) => p.PublicPort)
+        .map((p: any) => `${p.IP || '0.0.0.0'}:${p.PublicPort}->${p.PrivatePort}/${p.Type || 'tcp'}`)
+        .join(', ');
+      lines.push(`${name}|${portStr}`);
+    }
+    psCache = { ts: now, lines };
+    return lines;
+  } catch {
+    psCache = { ts: now, lines: [] };
+    return [];
+  }
+}
+
+function getCachedContainerState(cname: string): string | null {
+  const now = Date.now();
+  const hit = containerStateCache[cname];
+  if (hit && (now - hit.ts) < STATE_TTL) return hit.state;
+  return null;
+}
+
+function setCachedContainerState(cname: string, state: string) {
+  containerStateCache[cname] = { ts: Date.now(), state };
+}
+
 // waitHealth 已迁移至 ./health
 
 // 服务名解析由 ./naming 提供
@@ -433,9 +481,14 @@ const statusCache: Record<string, { ts: number; val: IpcResponse<ModuleStatus> }
 
 async function listRunningContainerNames(): Promise<Set<string>> {
   try {
-    const { stdout } = await run('docker ps --format "{{.Names}}"');
+    const docker = getDocker();
+    if (!docker) return new Set();
+    const list = await docker.listContainers({ all: false });
     const set = new Set<string>();
-    stdout.trim().split(/\r?\n/).forEach(l => l && set.add(l));
+    for (const it of list) {
+      const name = (Array.isArray(it.Names) && it.Names[0] ? String(it.Names[0]) : '').replace(/^\//, '');
+      if (name) set.add(name);
+    }
     return set;
   } catch {
     return new Set();
@@ -445,9 +498,14 @@ async function listRunningContainerNames(): Promise<Set<string>> {
 // 包含所有容器（运行中与已退出），用于避免 compose 与现存容器同名冲突
 async function listAllContainerNames(): Promise<Set<string>> {
   try {
-    const { stdout } = await run('docker ps -a --format "{{.Names}}"');
+    const docker = getDocker();
+    if (!docker) return new Set();
+    const list = await docker.listContainers({ all: true });
     const set = new Set<string>();
-    stdout.trim().split(/\r?\n/).forEach(l => l && set.add(l));
+    for (const it of list) {
+      const name = (Array.isArray(it.Names) && it.Names[0] ? String(it.Names[0]) : '').replace(/^\//, '');
+      if (name) set.add(name);
+    }
     return set;
   } catch {
     return new Set();

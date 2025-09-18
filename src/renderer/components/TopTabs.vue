@@ -119,7 +119,9 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { moduleStore } from '../stores/modules'
+import { getModuleStatus } from '../services/ipc'
 import { windowMinimize, windowMaximize, windowClose } from '../services/ipc'
+import { IPC } from '../../shared/ipc-contract'
 import {
   UserOutlined,
   SettingOutlined,
@@ -180,7 +182,38 @@ function onDocClick(e: MouseEvent) {
   showMenu.value = false
 }
 
-onMounted(() => document.addEventListener('click', onDocClick))
+onMounted(() => {
+  document.addEventListener('click', onDocClick)
+  // 订阅模块状态事件：即便不在首页，也能实时更新顶部状态点
+  try {
+    const onStatus = (_e: any, payload: any) => {
+      const name = String(payload?.name || '').toLowerCase()
+      const resp = payload?.status
+      if (!name || !resp?.success) return
+      const st = resp.data as any
+      ;(moduleStore.dots as any)[name] = (st.status === 'parse_error' ? 'error' : st.status)
+    }
+    ;(window as any).api.on(IPC.ModuleStatusEvent, onStatus)
+    onBeforeUnmount(() => {
+      try {
+        (window as any).api.off?.(IPC.ModuleStatusEvent, onStatus)
+        ;(window as any).api.removeListener?.(IPC.ModuleStatusEvent, onStatus)
+      } catch {}
+    })
+  } catch {}
+})
+
+// 启动时主动拉取一次初始状态，避免首次进入时状态点为空/未更新
+onMounted(async () => {
+  const names: string[] = ['n8n','dify','oneapi','ragflow']
+  for (const n of names) {
+    try {
+      const resp = await getModuleStatus(n as any)
+      const st = (resp as any)?.status
+      ;(moduleStore.dots as any)[n] = st === 'parse_error' ? 'error' : (st || 'stopped')
+    } catch {}
+  }
+})
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 const handleUserMenuClick = ({ key }: { key: string }) => {

@@ -1,13 +1,15 @@
 import { ipcMain, app } from 'electron';
 import { IPC, type IpcResponse } from '../../shared/ipc-contract';
-import { commandExists, dockerRunning } from '../docker/utils';
+import { dockerRunning } from '../docker/utils';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 ipcMain.handle(IPC.DockerCheck, async () => {
-  const installed = await commandExists('docker');
-  const running = installed ? await dockerRunning() : false;
+  // 使用 dockerode 尝试连接来判断是否“可用/运行”
+  const running = await dockerRunning();
+  // 将“installed”语义等同于“可连接”，避免依赖 CLI
+  const installed = running;
   return { success: true, data: { installed, running } };
 });
 

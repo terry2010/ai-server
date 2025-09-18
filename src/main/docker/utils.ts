@@ -23,8 +23,20 @@ export async function pickComposeCommand(): Promise<'docker compose' | 'docker-c
 
 export async function dockerRunning(): Promise<boolean> {
   try {
-    await execAsync('docker info', { timeout: 8000, windowsHide: true });
-    return true;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Docker = require('dockerode');
+    const isWin = process.platform === 'win32';
+    const docker = isWin ? new Docker({ socketPath: '//./pipe/docker_engine' }) : new Docker({ socketPath: '/var/run/docker.sock' });
+    if (!docker) return false;
+    // 尝试 ping 或 version
+    if (typeof docker.ping === 'function') {
+      await new Promise<void>((resolve, reject) => {
+        docker.ping((err: any, _data: any) => (err ? reject(err) : resolve()));
+      });
+      return true;
+    }
+    const ver = await docker.version();
+    return !!ver;
   } catch {
     return false;
   }

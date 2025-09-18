@@ -1,16 +1,16 @@
-// 门面：对外导出模块编排能力（后续可逐步用该门面替换 index.ts 的直接引用）
+// 门面：对外导出模块编排能力（已迁移到 operations/status 子模块）
 import type { ModuleName, ModuleStatus, IpcResponse, ModuleType } from '../../shared/ipc-contract';
 import {
   listModules as _listModules,
   startModule as _startModule,
   stopModule as _stopModule,
   firstStartModule as _firstStartModule,
-  getModuleStatus as _getModuleStatus,
   startModuleStream as _startModuleStream,
   stopModuleStream as _stopModuleStream,
   firstStartModuleStream as _firstStartModuleStream,
-  clearModuleCache as _clearModuleCache,
-} from './index';
+} from './operations';
+import { getModuleStatus as _getModuleStatus } from './status';
+import { clearModuleCache as _clearModuleCache } from './operations';
 
 export type { ModuleName, ModuleStatus, IpcResponse, ModuleType };
 

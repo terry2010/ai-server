@@ -36,6 +36,17 @@ export async function getModuleLogs(params?: { name?: ModuleName; tail?: number 
   return (res.data?.entries || []) as AppLogEntry[]
 }
 
+// 实时日志 attach/detach
+export async function attachModuleLogs(name: ModuleName, streamId: string): Promise<void> {
+  const res = await invoke(IPC.ModuleLogsAttach, { name, streamId })
+  if (!res?.success) throw new Error(res?.message || '日志 attach 失败')
+}
+
+export async function detachModuleLogs(name: ModuleName): Promise<void> {
+  const res = await invoke(IPC.ModuleLogsDetach, { name })
+  if (!res?.success) throw new Error(res?.message || '日志 detach 失败')
+}
+
 // 窗口控制
 export const windowMinimize = () => invoke(IPC.WindowMinimize)
 export const windowMaximize = () => invoke(IPC.WindowMaximize)

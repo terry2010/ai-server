@@ -43,7 +43,7 @@
  </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ReloadOutlined, PlayCircleOutlined } from '@ant-design/icons-vue'
 import { dockerCheck, dockerStart } from '../services/ipc'
 import { listModules, startModule } from '../services/ipc'
@@ -57,6 +57,7 @@ const starting = ref(false)
 const busy = ref(false)
 const uptimeText = ref('')
 const CACHE_KEY = 'dockerStatusCache.v1'
+let uptimeTimer: number | undefined
 
 function loadCache() {
   try {
@@ -77,7 +78,24 @@ async function refreshDocker() {
 
 async function startDocker() {
   starting.value = true
-  try { await dockerStart(); await new Promise(r=>setTimeout(r,1500)); await refreshDocker() } finally { starting.value = false }
+  try {
+    await dockerStart()
+    // 轮询等待 docker 运行，最多等 60 秒
+    const deadline = Date.now() + 60_000
+    while (Date.now() < deadline) {
+      try {
+        const r = await dockerCheck()
+        docker.value = r
+        saveCache()
+        if (r.running) break
+      } catch {}
+      await new Promise(r => setTimeout(r, 2000))
+    }
+    // 结束后再刷新一次，确保界面状态正确
+    await refreshDocker()
+  } finally {
+    starting.value = false
+  }
 }
 
 async function startAll() {
@@ -93,11 +111,13 @@ onMounted(async () => {
   loadCache()
   await refreshDocker()
   // 简单的本地运行时间展示
-  setInterval(() => {
+  uptimeTimer = window.setInterval(() => {
     const d = new Date()
     uptimeText.value = `${d.getHours()}小时 ${d.getMinutes()}分钟`
   }, 60000)
 })
+
+onUnmounted(() => { if (uptimeTimer) window.clearInterval(uptimeTimer) })
 </script>
 
 <style scoped>

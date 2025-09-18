@@ -56,12 +56,20 @@ app.whenReady().then(() => {
     require('./ipc/modules');
     require('./ipc/config');
     require('./ipc/window');
+    try {
+      const ev = require('./docker/events');
+      ev.tryStart?.();
+      console.log('[main] docker events watcher started');
+    } catch (e) {
+      console.warn('[main] start docker events watcher failed', e);
+    }
   } catch (e) {
     console.error('[main] failed to load ipc handlers:', e);
   }
 });
 
 app.on('window-all-closed', () => {
+  try { require('./docker/events')?.stopWatch?.() } catch {}
   if (process.platform !== 'darwin') app.quit();
 });
 
