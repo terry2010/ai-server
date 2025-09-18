@@ -191,12 +191,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { SaveOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { IPC } from '../../shared/ipc-contract'
 
 const activeTab = ref('system')
+let lastActiveTab = 'system'
 
 const systemSettings = ref({ name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true })
 const net = ref<{ mirrors: string[]; proxyMode: 'direct'|'system'|'manual'; proxyHost?: string; proxyPort?: number }>({ mirrors: [''], proxyMode: 'direct' })
@@ -248,6 +249,50 @@ onMounted(() => { loadNetwork() })
 
 function addMirror() { net.value.mirrors.push('') }
 function removeMirror(i: number) { if (net.value.mirrors.length > 1) net.value.mirrors.splice(i, 1) }
+
+// ---------- 脏标记与离开确认 ----------
+const initialSnapshot = ref<string>('')
+function takeSnapshot() {
+  const snap = JSON.stringify({ systemSettings: systemSettings.value, net: net.value, n8n: n8n.value, dify: dify.value, oneapi: oneapi.value, ragflow: ragflow.value })
+  initialSnapshot.value = snap
+}
+function isDirty(): boolean {
+  const cur = JSON.stringify({ systemSettings: systemSettings.value, net: net.value, n8n: n8n.value, dify: dify.value, oneapi: oneapi.value, ragflow: ragflow.value })
+  return cur !== initialSnapshot.value
+}
+
+// 首次加载网络配置后记录快照
+watch(() => net.value.mirrors, () => {}, { deep: true })
+onMounted(() => {
+  // 等待一次宏任务，确保 loadNetwork 完成后再拍快照
+  setTimeout(() => takeSnapshot(), 0)
+})
+
+// 切换Tab拦截
+watch(activeTab, (val, oldVal) => {
+  if (oldVal === undefined) { lastActiveTab = val; return }
+  if (!isDirty()) { lastActiveTab = val; return }
+  // 有未保存更改，弹出确认
+  Modal.confirm({
+    title: '有未保存的更改',
+    content: '切换会丢失未保存的更改，是否继续？',
+    okText: '继续',
+    cancelText: '取消',
+    onOk: () => { lastActiveTab = val; takeSnapshot() },
+    onCancel: () => { activeTab.value = lastActiveTab },
+  })
+})
+
+// 离开页面拦截
+// 使用 beforeunload 提示刷新/关闭窗口的场景
+window.addEventListener('beforeunload', (e) => {
+  if (!isDirty()) return
+  e.preventDefault()
+  e.returnValue = ''
+})
+
+// 使用 history 拦截路由跳转（简单处理：由 Logs/其它菜单触发的跳转时也会提示）
+// 若项目中有 onBeforeRouteLeave 可替换为更优雅的路由守卫方式
 </script>
 
 <style scoped>

@@ -23,6 +23,9 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false, // 无边框窗口
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 12, y: 12 } : undefined,
     webPreferences: {
       preload: path.resolve(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -38,6 +41,18 @@ function createWindow() {
   } else {
     win.loadFile(path.resolve(process.cwd(), 'dist/renderer/index.html'));
   }
+
+  // 在无边框窗口下，默认菜单被移除，Ctrl+Shift+I 可能失效，这里手动支持
+  win.webContents.on('before-input-event', (event: any, input: any) => {
+    const isDev = process.env.ELECTRON_START_URL || process.env.NODE_ENV === 'development'
+    if (!isDev) return
+    const mod = process.platform === 'darwin' ? input.meta : input.control
+    if (mod && input.shift && (input.key?.toLowerCase?.() === 'i')) {
+      if (win.webContents.isDevToolsOpened()) win.webContents.closeDevTools()
+      else win.webContents.openDevTools({ mode: 'detach' })
+      event.preventDefault()
+    }
+  })
 }
 
 app.whenReady().then(() => {

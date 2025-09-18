@@ -11,9 +11,9 @@
         </div>
       </div>
       <div class="status-section">
-        <span v-if="props.status!=='loading'" :class="['status-indicator', statusClass]"></span>
+        <span v-if="!(isBusy || props.status==='loading')" :class="['status-indicator', statusClass]"></span>
         <a-spin v-else size="small" />
-        <span class="status-text">{{ props.status==='loading' ? '加载中' : statusText }}</span>
+        <span class="status-text">{{ (isBusy || props.status==='loading') ? '加载中' : statusText }}</span>
       </div>
     </div>
     
@@ -76,14 +76,14 @@
         停止
       </a-button>
       
-      <a-button @click="openService" class="action-button" :disabled="props.status==='loading'">
+      <a-button @click="openService" class="action-button" :disabled="isBusy || props.status==='loading'">
         <template #icon>
           <link-outlined />
         </template>
         打开
       </a-button>
       
-      <a-button @click="viewLogs" class="action-button">
+      <a-button @click="viewLogs" class="action-button" :disabled="isBusy || props.status==='loading'">
         <template #icon>
           <file-text-outlined />
         </template>
