@@ -11,9 +11,13 @@ const router = createRouter({
       component: HomeView,
     },
     {
-      path: '/settings/:type',
+      path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
+    },
+    {
+      path: '/settings/:type',
+      redirect: '/settings',
     },
     { path: '/n8n', name: 'n8n', component: WebAppView },
     { path: '/dify', name: 'dify', component: WebAppView },

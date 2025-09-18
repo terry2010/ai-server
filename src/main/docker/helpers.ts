@@ -1,6 +1,7 @@
 import type { ModuleSchema } from '../config/schema'
 import { getGlobalConfig } from '../config/store'
 import { resolveDefaultVar } from './template'
+import { emitOpsLog } from '../logs/app-ops-log'
 
 export function getDocker(): any | null {
   try {
@@ -37,9 +38,8 @@ function resolveImage(mod: ModuleSchema): string | undefined {
 function applyRegistryMirror(image: string): string {
   try {
     const cfg = getGlobalConfig() as any
-    const mirror = cfg?.docker?.mirror?.url as string | undefined
-    const enabled = !!cfg?.docker?.mirror?.enabled
-    if (!enabled || !mirror) return image
+    const mirrors = Array.isArray(cfg?.docker?.mirrors) ? (cfg.docker.mirrors as string[]) : []
+    if (mirrors.length === 0) return image
     // parse image into [registry]/[namespace]/repo:tag
     // if no registry specified, default is docker.io
     const hasRegistry = image.includes('/') && (image.split('/')[0].includes('.') || image.split('/')[0].includes(':'))
@@ -48,14 +48,55 @@ function applyRegistryMirror(image: string): string {
     // ensure library namespace for single-segment repo names
     if (!rest.includes('/')) rest = `library/${rest}`
     if (registry === 'docker.io' || registry === 'index.docker.io' || registry === 'registry-1.docker.io') {
-      // rewrite to mirror
-      const trimmed = mirror.replace(/\/$/, '')
-      return `${trimmed}/${rest}`
+      // 依次尝试多个镜像基址（规范化为 host[:port]，不含协议）
+      for (const m of mirrors) {
+        const trimmed = normalizeMirrorHost(m)
+        if (trimmed) return `${trimmed}/${rest}`
+      }
     }
     return image
   } catch {
     return image
   }
+}
+
+function normalizeMirrorHost(m: string): string {
+  try {
+    // 去掉协议与尾随斜杠，仅保留 host[:port]/path 可选
+    let s = String(m).trim()
+    s = s.replace(/^https?:\/\//i, '')
+    s = s.replace(/\/$/, '')
+    return s
+  } catch { return m }
+}
+
+function buildMirrorCandidates(image: string): string[] {
+  try {
+    const cfg = getGlobalConfig() as any
+    const mirrorsRaw = Array.isArray(cfg?.docker?.mirrors) ? (cfg.docker.mirrors as string[]) : []
+    const mirrors = mirrorsRaw.map(normalizeMirrorHost).filter(Boolean)
+    // 解析 registry 与剩余部分
+    const hasRegistry = image.includes('/') && (image.split('/')[0].includes('.') || image.split('/')[0].includes(':'))
+    const registry = hasRegistry ? image.split('/')[0] : 'docker.io'
+    const rest0 = hasRegistry ? image.substring(registry.length + 1) : image
+    const rest = rest0.includes('/') ? rest0 : `library/${rest0}`
+    const isDockerHub = (registry === 'docker.io' || registry === 'index.docker.io' || registry === 'registry-1.docker.io')
+    const isMirrorHost = mirrors.includes(registry)
+    const cands: string[] = []
+    if (isDockerHub) {
+      for (const h of mirrors) cands.push(`${h}/${rest}`)
+      cands.push(`docker.io/${rest}`)
+    } else if (isMirrorHost) {
+      // 当前就是某个镜像站，尝试其它镜像站 + 原始 docker.io
+      for (const h of mirrors) cands.push(`${h}/${rest}`)
+      cands.push(`docker.io/${rest}`)
+    } else {
+      // 非 docker hub 与镜像站，返回原样
+      cands.push(image)
+    }
+    // 去重保序
+    return Array.from(new Set(cands))
+  } catch { return [image] }
 }
 
 function resolveCommand(mod: ModuleSchema): string[] | undefined {
@@ -80,14 +121,52 @@ export async function ensureImage(image: string): Promise<void> {
   if (!docker) throw new Error('dockerode 不可用')
   const imgs = await docker.listImages()
   const has = imgs.some((im: any) => (im.RepoTags || []).includes(image))
-  if (!has) {
-    await new Promise<void>((resolve, reject) => {
-      docker.pull(image, (err: any, stream: any) => {
-        if (err) return reject(err)
-        docker.modem.followProgress(stream, (err2: any) => (err2 ? reject(err2) : resolve()))
+  if (has) return
+  emitOpsLog(`[image] local miss, will pull: ${image}`)
+  const candidates = buildMirrorCandidates(image)
+  let lastErr: any = null
+  for (const img of candidates) {
+    try {
+      emitOpsLog(`[image] pull start: ${img}`)
+      await new Promise<void>((resolve, reject) => {
+        docker.pull(img, (err: any, stream: any) => {
+          if (err) {
+            emitOpsLog(`[image] pull error(init): ${img} -> ${String(err?.message || err)}`, 'error')
+            return reject(err)
+          }
+          const onFinished = (err2: any) => {
+            if (err2) {
+              emitOpsLog(`[image] pull error: ${img} -> ${String(err2?.message || err2)}`, 'error')
+              reject(err2)
+            } else {
+              emitOpsLog(`[image] pull done: ${img}`)
+              resolve()
+            }
+          }
+          const onProgress = (evt: any) => {
+            try {
+              if (evt?.status) {
+                const id = evt.id ? ` (${evt.id})` : ''
+                const prog = evt.progress ? ` ${evt.progress}` : ''
+                emitOpsLog(`[image] ${evt.status}${id}${prog}: ${img}`)
+              }
+            } catch {}
+          }
+          docker.modem.followProgress(stream, onFinished, onProgress)
+        })
       })
-    })
+      // 成功
+      return
+    } catch (e) {
+      lastErr = e
+      // 尝试下一个候选
+      continue
+    }
   }
+  // 所有候选失败
+  const msg = String(lastErr?.message || lastErr || 'unknown')
+  emitOpsLog(`[image] pull failed for all mirrors: ${candidates.join(', ')} -> ${msg}`, 'error')
+  throw lastErr
 }
 
 export function toEnvArray(rec?: Record<string, string>): string[] | undefined {

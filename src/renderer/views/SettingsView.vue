@@ -1,128 +1,253 @@
 <template>
   <div class="settings-view">
     <div class="settings-header">
-      <h1 class="settings-title">{{ getSettingsTitle() }}</h1>
-      <p class="settings-subtitle">{{ getSettingsSubtitle() }}</p>
+      <h1 class="settings-title">系统设置</h1>
+      <p class="settings-subtitle">统一管理所有设置。左侧标签切换不同分类。</p>
     </div>
-    
+
     <div class="settings-content">
       <a-card class="settings-card glass-effect">
-        <template v-if="settingsType === 'system'">
-          <a-form layout="vertical">
-            <a-row :gutter="24">
-              <a-col :span="12">
-                <a-form-item label="系统名称">
-                  <a-input v-model:value="systemSettings.name" placeholder="AI-Server 管理平台" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="系统端口">
-                  <a-input-number v-model:value="systemSettings.port" :min="1000" :max="65535" style="width: 100%" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            
-            <a-row :gutter="24">
-              <a-col :span="12">
-                <a-form-item label="日志级别">
-                  <a-select v-model:value="systemSettings.logLevel">
-                    <a-select-option value="debug">Debug</a-select-option>
-                    <a-select-option value="info">Info</a-select-option>
-                    <a-select-option value="warn">Warning</a-select-option>
-                    <a-select-option value="error">Error</a-select-option>
-                  </a-select>
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="自动启动">
-                  <a-switch v-model:checked="systemSettings.autoStart" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </template>
-        
-        <template v-else-if="settingsType === 'n8n'">
-          <a-form layout="vertical">
-            <a-row :gutter="24">
-              <a-col :span="12">
-                <a-form-item label="服务端口">
-                  <a-input-number v-model:value="serviceSettings.port" :min="1000" :max="65535" style="width: 100%" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="数据库URL">
-                  <a-input v-model:value="serviceSettings.dbUrl" placeholder="postgresql://..." />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            
-            <a-form-item label="环境变量">
-              <a-textarea v-model:value="serviceSettings.env" :rows="6" placeholder="NODE_ENV=production&#10;N8N_BASIC_AUTH_ACTIVE=true" />
-            </a-form-item>
-          </a-form>
-        </template>
-        
-        <template v-else>
-          <a-form layout="vertical">
-            <a-row :gutter="24">
-              <a-col :span="12">
-                <a-form-item label="服务端口">
-                  <a-input-number v-model:value="serviceSettings.port" :min="1000" :max="65535" style="width: 100%" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="API密钥">
-                  <a-input-password v-model:value="serviceSettings.apiKey" placeholder="输入API密钥" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            
-            <a-form-item label="配置文件">
-              <a-textarea v-model:value="serviceSettings.config" :rows="8" placeholder="配置内容..." />
-            </a-form-item>
-          </a-form>
-        </template>
-        
-        <div class="settings-actions">
-          <a-button type="primary" size="large" @click="saveSettings" class="action-button save-btn">
-            <template #icon><save-outlined /></template>
-            保存设置
-          </a-button>
-          <a-button size="large" @click="resetSettings" class="action-button refresh-btn">
-            <template #icon><reload-outlined /></template>
-            重置
-          </a-button>
-          <a-button size="large" @click="testConnection" class="action-button">
-            <template #icon><api-outlined /></template>
-            测试连接
-          </a-button>
-        </div>
+        <a-tabs v-model:activeKey="activeTab" tab-position="left">
+          <!-- 系统设置 -->
+          <a-tab-pane key="system" tab="系统设置">
+            <a-form layout="vertical">
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form-item label="系统名称">
+                    <a-input v-model:value="systemSettings.name" placeholder="AI-Server 管理平台" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="系统端口">
+                    <a-input-number v-model:value="systemSettings.port" :min="1000" :max="65535" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form-item label="日志级别">
+                    <a-select v-model:value="systemSettings.logLevel">
+                      <a-select-option value="debug">Debug</a-select-option>
+                      <a-select-option value="info">Info</a-select-option>
+                      <a-select-option value="warn">Warning</a-select-option>
+                      <a-select-option value="error">Error</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="自动启动">
+                    <a-switch v-model:checked="systemSettings.autoStart" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </a-tab-pane>
+
+          <!-- 网络设置 -->
+          <a-tab-pane key="network" tab="网络设置">
+            <a-alert type="info" show-icon style="margin-bottom: 12px;" :message="'Docker 镜像加速优先推荐在 Docker Desktop -> Docker Engine 配置 registry-mirrors；此处为应用侧镜像重写，能缓解国内拉取慢/超时问题。Docker 代理需在 Docker Desktop 配置 Proxies。'" />
+            <a-form layout="vertical">
+              <a-divider>镜像加速</a-divider>
+              <a-row :gutter="24">
+                <a-col :span="24">
+                  <a-form-item label="镜像加速地址（支持多个）">
+                    <div class="mirror-list">
+                      <div class="mirror-row" v-for="(m, idx) in net.mirrors" :key="idx">
+                        <a-input v-model:value="net.mirrors[idx]" placeholder="例如 https://docker.m.daocloud.io" style="flex: 1;" />
+                        <a-button type="text" danger @click="removeMirror(idx)" v-if="net.mirrors.length > 1">删除</a-button>
+                      </div>
+                      <a-button type="dashed" block @click="addMirror">添加镜像地址</a-button>
+                    </div>
+                  </a-form-item>
+                </a-col>
+              </a-row>
+
+              <a-divider>代理设置</a-divider>
+              <a-row :gutter="24">
+                <a-col :span="8">
+                  <a-form-item label="代理模式">
+                    <a-select v-model:value="net.proxyMode">
+                      <a-select-option value="direct">直连</a-select-option>
+                      <a-select-option value="system">使用系统代理</a-select-option>
+                      <a-select-option value="manual">手动配置</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="代理主机" v-if="net.proxyMode==='manual'">
+                    <a-input v-model:value="net.proxyHost" placeholder="127.0.0.1" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="8">
+                  <a-form-item label="代理端口" v-if="net.proxyMode==='manual'">
+                    <a-input-number v-model:value="net.proxyPort" :min="1" :max="65535" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+
+              <a-alert type="warning" show-icon :message="'注意：Docker 拉取镜像是否使用代理取决于 Docker Desktop 的代理设置。本应用内的代理设置仅用于应用自身的网络请求与镜像名重写，并不会强制影响 Docker daemon。'" />
+            </a-form>
+
+            <div class="settings-actions">
+              <a-button type="primary" size="large" @click="saveNetwork" class="action-button save-btn">
+                <template #icon><save-outlined /></template>
+                保存网络设置
+              </a-button>
+              <a-button size="large" @click="reloadNetwork" class="action-button refresh-btn">
+                <template #icon><reload-outlined /></template>
+                重新载入
+              </a-button>
+            </div>
+          </a-tab-pane>
+
+          <!-- n8n 设置（Demo） -->
+          <a-tab-pane key="n8n" tab="n8n 设置">
+            <a-form layout="vertical">
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form-item label="服务端口">
+                    <a-input-number v-model:value="n8n.port" :min="1000" :max="65535" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="数据库URL">
+                    <a-input v-model:value="n8n.dbUrl" placeholder="postgresql://..." />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="环境变量">
+                <a-textarea v-model:value="n8n.env" :rows="6" placeholder="NODE_ENV=production\nN8N_BASIC_AUTH_ACTIVE=true" />
+              </a-form-item>
+            </a-form>
+          </a-tab-pane>
+
+          <!-- Dify 设置（Demo） -->
+          <a-tab-pane key="dify" tab="Dify 设置">
+            <a-form layout="vertical">
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form-item label="服务端口">
+                    <a-input-number v-model:value="dify.port" :min="1000" :max="65535" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="数据库URL">
+                    <a-input v-model:value="dify.dbUrl" placeholder="postgresql://..." />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="环境变量">
+                <a-textarea v-model:value="dify.env" :rows="6" placeholder="示例环境变量..." />
+              </a-form-item>
+            </a-form>
+          </a-tab-pane>
+
+          <!-- OneAPI 设置（Demo） -->
+          <a-tab-pane key="oneapi" tab="OneAPI 设置">
+            <a-form layout="vertical">
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form-item label="服务端口">
+                    <a-input-number v-model:value="oneapi.port" :min="1000" :max="65535" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="API 密钥">
+                    <a-input-password v-model:value="oneapi.apiKey" placeholder="输入API密钥" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="配置文件">
+                <a-textarea v-model:value="oneapi.config" :rows="8" placeholder="配置内容..." />
+              </a-form-item>
+            </a-form>
+          </a-tab-pane>
+
+          <!-- RagFlow 设置（Demo） -->
+          <a-tab-pane key="ragflow" tab="RagFlow 设置">
+            <a-form layout="vertical">
+              <a-row :gutter="24">
+                <a-col :span="12">
+                  <a-form-item label="服务端口">
+                    <a-input-number v-model:value="ragflow.port" :min="1000" :max="65535" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="向量库地址">
+                    <a-input v-model:value="ragflow.vectorUrl" placeholder="qdrant://..." />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="环境变量">
+                <a-textarea v-model:value="ragflow.env" :rows="6" placeholder="示例环境变量..." />
+              </a-form-item>
+            </a-form>
+          </a-tab-pane>
+
+        </a-tabs>
       </a-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import { SaveOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import { IPC } from '../../shared/ipc-contract'
 
-const route = useRoute()
-const settingsType = computed(() => route.params.type as string)
+const activeTab = ref('system')
 
 const systemSettings = ref({ name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true })
-const serviceSettings = ref({ port: 5678, dbUrl: 'postgresql://localhost:5432/n8n', apiKey: '', env: 'NODE_ENV=production\nN8N_BASIC_AUTH_ACTIVE=true', config: '' })
+const net = ref<{ mirrors: string[]; proxyMode: 'direct'|'system'|'manual'; proxyHost?: string; proxyPort?: number }>({ mirrors: [''], proxyMode: 'direct' })
+const n8n = ref({ port: 5678, dbUrl: 'postgresql://localhost:5432/n8n', env: 'NODE_ENV=production\nN8N_BASIC_AUTH_ACTIVE=true' })
+const dify = ref({ port: 5001, dbUrl: 'postgresql://localhost:5432/dify', env: '' })
+const oneapi = ref({ port: 3000, apiKey: '', config: '' })
+const ragflow = ref({ port: 8000, vectorUrl: 'qdrant://localhost:6333', env: '' })
 
-const getSettingsTitle = () => ({ system: '系统设置', n8n: 'n8n 设置', dify: 'Dify 设置', oneapi: 'OneAPI 设置', ragflow: 'RagFlow 设置' } as any)[settingsType.value] || '设置'
-const getSettingsSubtitle = () => ({ system: '配置系统全局参数和行为', n8n: '配置 n8n 工作流自动化平台', dify: '配置 Dify AI 应用开发平台', oneapi: '配置 OneAPI 代理服务', ragflow: '配置 RagFlow 知识库问答系统' } as any)[settingsType.value] || '配置服务参数'
+const saveSettings = async () => { try { await new Promise(r => setTimeout(r, 800)); message.success('设置保存成功（Demo）') } catch { message.error('设置保存失败') } }
+const resetSettings = () => { systemSettings.value = { name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true }; message.info('设置已重置') }
+const testConnection = async () => { try { await new Promise(r => setTimeout(r, 800)); message.success('连接测试成功（Demo）') } catch { message.error('连接测试失败') } }
 
-const saveSettings = async () => { try { await new Promise(r => setTimeout(r, 1000)); message.success('设置保存成功') } catch { message.error('设置保存失败') } }
-const resetSettings = () => { if (settingsType.value === 'system') { systemSettings.value = { name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true } } else { serviceSettings.value = { port: 5678, dbUrl: 'postgresql://localhost:5432/n8n', apiKey: '', env: 'NODE_ENV=production\nN8N_BASIC_AUTH_ACTIVE=true', config: '' } } message.info('设置已重置') }
-const testConnection = async () => { try { await new Promise(r => setTimeout(r, 2000)); message.success('连接测试成功') } catch { message.error('连接测试失败') } }
+async function loadNetwork() {
+  try {
+    const res = await (window as any).api.invoke(IPC.ConfigGet, 'global')
+    if (res?.success) {
+      const g = res.data || {}
+      const proxy = g?.network?.proxy || {}
+      const mirrors = Array.isArray(g?.docker?.mirrors) ? g.docker.mirrors : []
+      net.value.mirrors = mirrors.length ? mirrors : ['']
+      net.value.proxyMode = (proxy.mode || 'direct')
+      net.value.proxyHost = proxy.host || ''
+      net.value.proxyPort = proxy.port || undefined
+    }
+  } catch (e:any) {
+    console.error('loadNetwork error', e)
+  }
+}
 
-onMounted(() => { console.log('加载设置:', settingsType.value) })
+async function saveNetwork() {
+  try {
+    const payload = {
+      global: {
+        docker: { mirrors: net.value.mirrors.filter(x => String(x || '').trim()) },
+        network: { proxy: { mode: net.value.proxyMode, host: net.value.proxyHost, port: net.value.proxyPort } }
+      }
+    }
+    const res = await (window as any).api.invoke(IPC.ConfigSet, payload)
+    if (!res?.success) throw new Error(res?.message || '保存失败')
+    message.success('网络设置已保存并生效')
+  } catch (e:any) {
+    message.error(e?.message || '保存失败')
+  }
+}
+
+const reloadNetwork = () => loadNetwork()
+
+onMounted(() => { loadNetwork() })
+
+function addMirror() { net.value.mirrors.push('') }
+function removeMirror(i: number) { if (net.value.mirrors.length > 1) net.value.mirrors.splice(i, 1) }
 </script>
 
 <style scoped>
@@ -133,6 +258,8 @@ onMounted(() => { console.log('加载设置:', settingsType.value) })
 .settings-content { width: 100%; }
 .settings-card { border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); padding: var(--spacing-xl); background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); }
 .settings-actions { display: flex; gap: var(--spacing-md); justify-content: center; margin-top: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--border-light); }
+.mirror-list { display: flex; flex-direction: column; gap: 8px; }
+.mirror-row { display: flex; gap: 8px; align-items: center; }
 .settings-actions .ant-btn { min-width: 120px; border-radius: var(--radius-md); font-weight: 500; transition: all var(--transition-base); }
 .settings-actions .ant-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .settings-actions .ant-btn-primary { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); border: none; box-shadow: 0 0 20px rgba(0, 122, 255, 0.3); }

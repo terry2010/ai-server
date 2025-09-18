@@ -52,6 +52,7 @@ export const IPC = {
   ModuleLogs: 'ai/module/logs',
   ModuleLogsAttach: 'ai/module/logsAttach',
   ModuleLogsDetach: 'ai/module/logsDetach',
+  AppClientLogsGet: 'ai/logs/client/get',
   ConfigGet: 'ai/config/get',
   ConfigSet: 'ai/config/set',
   ModuleLogEvent: 'ai/module/log',

@@ -27,34 +27,6 @@
         系统设置
       </a-menu-item>
       
-      <a-menu-item key="n8n-settings" class="menu-item">
-        <template #icon>
-          <tool-outlined />
-        </template>
-        n8n 设置
-      </a-menu-item>
-      
-      <a-menu-item key="dify-settings" class="menu-item">
-        <template #icon>
-          <build-outlined />
-        </template>
-        Dify 设置
-      </a-menu-item>
-      
-      <a-menu-item key="oneapi-settings" class="menu-item">
-        <template #icon>
-          <thunderbolt-outlined />
-        </template>
-        OneAPI 设置
-      </a-menu-item>
-      
-      <a-menu-item key="ragflow-settings" class="menu-item">
-        <template #icon>
-          <deployment-unit-outlined />
-        </template>
-        RagFlow 设置
-      </a-menu-item>
-      
       <a-menu-divider />
       
       <a-menu-item key="logs" class="menu-item">
@@ -113,9 +85,8 @@ const handleMenuSelect = ({ key }: { key: string }) => {
   // 路由跳转逻辑
   if (key === 'dashboard') {
     router.push({ name: 'home' })
-  } else if (key.endsWith('-settings')) {
-    const settingType = key.replace('-settings', '')
-    router.push(`/settings/${settingType}`)
+  } else if (key === 'system-settings') {
+    router.push('/settings')
   } else if (key === 'logs') {
     if (String(route.name || '').toLowerCase() === 'logs') {
       window.dispatchEvent(new CustomEvent('reopen-logs'))
@@ -133,6 +104,7 @@ const handleMenuSelect = ({ key }: { key: string }) => {
 watch(() => route.name, (n) => {
   const name = String(n || '').toLowerCase()
   if (name === 'home') selectedKeys.value = ['dashboard']
+  else if (name === 'settings') selectedKeys.value = ['system-settings']
   else if (name === 'logs') selectedKeys.value = ['logs']
   else if (name === 'monitoring') selectedKeys.value = ['monitoring']
 })

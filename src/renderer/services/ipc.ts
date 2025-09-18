@@ -10,6 +10,13 @@ export async function listModules(): Promise<{ name: string; type: string }[]> {
   return res.data?.items || []
 }
 
+// 客户端（ops）日志历史
+export async function getClientOpsLogs(tail = 500): Promise<Array<{ id: string; timestamp: string; level: string; message: string }>> {
+  const res = await invoke(IPC.AppClientLogsGet, { tail })
+  if (!res?.success) throw new Error(res?.message || '读取客户端日志失败')
+  return res.data || []
+}
+
 export async function getModuleStatus(name: ModuleName): Promise<ModuleStatus> {
   const res = await invoke(IPC.ModuleStatus, { name })
   if (!res?.success) throw new Error(res?.message || `获取模块状态失败: ${name}`)

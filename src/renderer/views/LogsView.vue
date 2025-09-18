@@ -64,7 +64,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
-import { getModuleLogs, listModules, type AppLogEntry } from '../services/ipc'
+import { getModuleLogs, listModules, type AppLogEntry, getClientOpsLogs } from '../services/ipc'
+import { IPC } from '../../shared/ipc-contract'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,20 +73,30 @@ const router = useRouter()
 const logLevel = ref<'all' | 'error' | 'warn' | 'info' | 'debug'>('all')
 const currentModule = ref<string | undefined>(undefined)
 const logs = ref<AppLogEntry[]>([])
+const clientLogs = ref<AppLogEntry[]>([])
 const moduleOptions = ref<string[]>([])
 const moduleSelect = ref<string | undefined>(undefined)
 
+const isClient = computed(() => moduleSelect.value === 'client')
 const filteredLogs = computed(() => {
   // 当前实现：当路由带有 module 查询参数时，后端已按模块聚合返回日志
   // 因此此处不再用 service 进行二次过滤，以免误杀
-  let base = logs.value
+  let base = isClient.value ? clientLogs.value : logs.value
   // 若没有通过路由指定模块，但用户点击了某个服务名进行快速过滤，可保留按 service 的简单过滤
   if (!route.query.module && currentModule.value) {
     const key = currentModule.value.toLowerCase()
     base = base.filter(l => l.service.toLowerCase().includes(key) || (l.module && l.module.toLowerCase().includes(key)))
   }
-  if (logLevel.value === 'all') return base
-  return base.filter(l => l.level === logLevel.value)
+  // 级别过滤
+  const levelFiltered = (logLevel.value === 'all') ? base : base.filter(l => l.level === logLevel.value)
+  // 新到旧（逆序）
+  return [...levelFiltered].sort((a, b) => {
+    const ta = Date.parse(a.timestamp || '') || 0
+    const tb = Date.parse(b.timestamp || '') || 0
+    if (ta && tb) return tb - ta
+    // 回退：用 id 作为近似顺序（id 越大越新）
+    return String(b.id).localeCompare(String(a.id))
+  })
 })
 
 const pageSize = ref<number>(100)
@@ -103,6 +114,13 @@ const applyRouteFilter = () => {
 
 async function loadLogs(showMsg = false) {
   try {
+    if (isClient.value) {
+      // 客户端日志：先加载历史，再继续实时
+      const hist = await getClientOpsLogs(1000)
+      clientLogs.value = hist.map((h, idx) => ({ id: `${h.timestamp}-${idx}`, timestamp: h.timestamp, service: 'client', module: 'client', moduleType: 'basic', level: (h.level as any) || 'info', message: h.message }))
+      if (showMsg) message.success('已加载客户端历史日志')
+      return
+    }
     const entries = await getModuleLogs(currentModule.value ? { name: currentModule.value as any, tail: 300 } : { tail: 300 })
     logs.value = entries
     if (showMsg) message.success('日志已刷新')
@@ -142,15 +160,26 @@ function onModuleSelect(val?: string) {
   if (!val) {
     router.replace({ path: '/logs' })
   } else {
-    router.replace({ path: '/logs', query: { module: val } })
+    if (val === 'client') {
+      router.replace({ path: '/logs' })
+    } else {
+      router.replace({ path: '/logs', query: { module: val } })
+    }
   }
+  // 立即触发加载，减少等待
+  setTimeout(() => { loadLogs(true); scrollToTop() }, 0)
 }
 
 onMounted(async () => {
   // 拉取模块列表供下拉选择
-  try { moduleOptions.value = (await listModules()).map(m => m.name) } catch {}
+  try {
+    moduleOptions.value = ['client', ...(await listModules()).map(m => m.name)]
+  } catch {
+    moduleOptions.value = ['client']
+  }
   applyRouteFilter()
-  await loadLogs(false)
+  // 异步加载历史，不阻塞页面渲染
+  setTimeout(() => { loadLogs(false) }, 0)
   // 监听从侧栏重复点击“系统日志”的自定义事件，重置筛选并刷新
   const reopen = () => {
     logLevel.value = 'all'
@@ -159,10 +188,27 @@ onMounted(async () => {
     current.value = 1
     router.replace({ path: '/logs' })
     loadLogs(false)
+    scrollToTop()
   }
   window.addEventListener('reopen-logs', reopen)
+  // 订阅主进程推送的客户端日志（ops等）
+  const onIpcLog = (_e: any, p: any) => {
+    try {
+      const ts = new Date().toISOString()
+      const level = (p?.level || p?.event || 'info').toLowerCase()
+      const msg = typeof p?.chunk === 'string' ? p.chunk : JSON.stringify(p)
+      // 最新在最前
+      clientLogs.value.unshift({ id: `${ts}-${clientLogs.value.length}`, timestamp: ts, service: 'client', module: 'client', moduleType: 'basic', level: ['error','warn','info','debug'].includes(level) ? level : 'info', message: msg })
+      // 控制内存：仅保留最近 2000 条
+      if (clientLogs.value.length > 2000) clientLogs.value.length = 2000
+    } catch {}
+  }
+  ;(window as any).api.on(IPC.ModuleLogEvent, onIpcLog)
   // 卸载清理
-  onUnmounted(() => window.removeEventListener('reopen-logs', reopen))
+  onUnmounted(() => {
+    window.removeEventListener('reopen-logs', reopen)
+    try { (window as any).api.off?.(IPC.ModuleLogEvent, onIpcLog) } catch {}
+  })
 })
 
 watch(() => route.fullPath, () => {
@@ -172,7 +218,9 @@ watch(() => route.fullPath, () => {
     logLevel.value = 'all'
     current.value = 1
   }
-  loadLogs(false)
+  // 异步触发加载，避免页面卡住
+  setTimeout(() => { loadLogs(false) }, 0)
+  scrollToTop()
 })
 
 // 当 pageSize 改变时重置页码，并限制取值范围 20-500
@@ -184,6 +232,15 @@ watch(pageSize, (val) => {
 
 // 当过滤条件变化时重置到第 1 页
 watch([filteredLogs, logLevel], () => { current.value = 1 })
+
+// 滚动到顶部，进入“系统日志”或切换模块后调用
+function scrollToTop() {
+  try {
+    const el = document.querySelector('.log-container') as HTMLElement | null
+    if (el) el.scrollTop = 0
+  } catch {}
+  try { window.scrollTo({ top: 0 }) } catch {}
+}
 </script>
 
 <style scoped>
