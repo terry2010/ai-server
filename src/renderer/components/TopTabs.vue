@@ -264,6 +264,7 @@ const handleMenu = () => { /* 示例菜单通过 a-dropdown 在右侧 user-secti
 
 <style scoped>
 .top-tabs {
+  margin: -1px 0 0 0;
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   padding: 0 6px; /* 缩小左右留白以适配 40px 高度 */
