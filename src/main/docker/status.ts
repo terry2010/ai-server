@@ -163,12 +163,17 @@ export async function getModuleStatus(name: ModuleName): Promise<IpcResponse<Mod
     } catch {}
 
     let status: ModuleStatus['status'] = 'stopped'
-    const allRunning = states.length > 0 && states.every(s => s === 'running')
     const isStoppedState = (s: string) => ['exited', 'created', 'dead', 'stopped', 'paused'].includes(s)
-    const allFullyStopped = states.length > 0 && states.every(s => isStoppedState(s))
-    if (allRunning) status = 'running'
-    else if (allFullyStopped) status = 'stopped'
-    else status = 'error'
+    if (states.length === 0) {
+      // 无任何容器时按“停止”处理（可能是首次未初始化或已被清理）
+      status = 'stopped'
+    } else {
+      const allRunning = states.every(s => s === 'running')
+      const allFullyStopped = states.every(s => isStoppedState(s))
+      if (allRunning) status = 'running'
+      else if (allFullyStopped) status = 'stopped'
+      else status = 'error'
+    }
     const running = status === 'running'
 
     let usedBy: string[] | undefined = undefined
