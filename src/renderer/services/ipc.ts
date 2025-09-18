@@ -58,6 +58,15 @@ export async function detachModuleLogs(name: ModuleName): Promise<void> {
 export const windowMinimize = () => invoke(IPC.WindowMinimize)
 export const windowMaximize = () => invoke(IPC.WindowMaximize)
 export const windowClose = () => invoke(IPC.WindowClose)
+export const windowGetState = async (): Promise<{ isMaximized: boolean; isFullScreen: boolean }> => {
+  const res = await invoke(IPC.WindowGetState)
+  if (!res?.success) throw new Error(res?.message || '获取窗口状态失败')
+  return res.data
+}
+export const windowOpenDevTools = async (): Promise<void> => {
+  const res = await invoke(IPC.WindowOpenDevTools)
+  if (!res?.success) throw new Error(res?.message || '打开调试窗口失败')
+}
 
 // Docker 状态/启动
 export async function dockerCheck(): Promise<{ installed: boolean; running: boolean }> {

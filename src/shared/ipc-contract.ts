@@ -60,4 +60,7 @@ export const IPC = {
   WindowMinimize: 'ai/window/minimize',
   WindowMaximize: 'ai/window/maximize',
   WindowClose: 'ai/window/close',
+  WindowGetState: 'ai/window/getState',
+  WindowStateEvent: 'ai/window/stateEvent',
+  WindowOpenDevTools: 'ai/window/openDevTools',
 } as const;

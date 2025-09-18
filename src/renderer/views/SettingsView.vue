@@ -184,6 +184,22 @@
             </a-form>
           </a-tab-pane>
 
+          <!-- 调试设置（实时生效） -->
+          <a-tab-pane key="debug" tab="调试设置">
+            <a-form layout="vertical">
+              <a-alert type="warning" show-icon style="margin-bottom: 12px;" message="以下设置实时生效，无需保存" />
+              <a-form-item label="窗口控制样式（实时生效）">
+                <a-radio-group v-model:value="ui.windowControlsMode" @change="applyUiMode">
+                  <a-radio value="all">全部显示</a-radio>
+                  <a-radio value="mac">按 macOS 窗口显示</a-radio>
+                  <a-radio value="windows">按 Windows 窗口显示</a-radio>
+                </a-radio-group>
+              </a-form-item>
+              <a-form-item>
+                <a-button type="primary" @click="windowOpenDevTools">打开调试窗口</a-button>
+              </a-form-item>
+            </a-form>
+          </a-tab-pane>
         </a-tabs>
       </a-card>
     </div>
@@ -195,9 +211,12 @@ import { ref, onMounted, watch } from 'vue'
 import { SaveOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { IPC } from '../../shared/ipc-contract'
+import { windowOpenDevTools } from '../services/ipc'
 
 const activeTab = ref('system')
 let lastActiveTab = 'system'
+const inited = ref(false)
+const hasUserEdited = ref(false)
 
 const systemSettings = ref({ name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true })
 const net = ref<{ mirrors: string[]; proxyMode: 'direct'|'system'|'manual'; proxyHost?: string; proxyPort?: number }>({ mirrors: [''], proxyMode: 'direct' })
@@ -205,6 +224,7 @@ const n8n = ref({ port: 5678, dbUrl: 'postgresql://localhost:5432/n8n', env: 'NO
 const dify = ref({ port: 5001, dbUrl: 'postgresql://localhost:5432/dify', env: '' })
 const oneapi = ref({ port: 3000, apiKey: '', config: '' })
 const ragflow = ref({ port: 8000, vectorUrl: 'qdrant://localhost:6333', env: '' })
+const ui = ref<{ windowControlsMode: 'all'|'mac'|'windows' }>({ windowControlsMode: 'all' })
 
 const saveSettings = async () => { try { await new Promise(r => setTimeout(r, 800)); message.success('设置保存成功（Demo）') } catch { message.error('设置保存失败') } }
 const resetSettings = () => { systemSettings.value = { name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true }; message.info('设置已重置') }
@@ -221,6 +241,12 @@ async function loadNetwork() {
       net.value.proxyMode = (proxy.mode || 'direct')
       net.value.proxyHost = proxy.host || ''
       net.value.proxyPort = proxy.port || undefined
+      // UI 设置
+      const mode = g?.ui?.windowControlsMode
+      ui.value.windowControlsMode = (mode === 'mac' || mode === 'windows' || mode === 'all') ? mode : 'all'
+      // 配置注入完毕再拍快照并标记初始化完成
+      takeSnapshot()
+      inited.value = true
     }
   } catch (e:any) {
     console.error('loadNetwork error', e)
@@ -261,17 +287,12 @@ function isDirty(): boolean {
   return cur !== initialSnapshot.value
 }
 
-// 首次加载网络配置后记录快照
-watch(() => net.value.mirrors, () => {}, { deep: true })
-onMounted(() => {
-  // 等待一次宏任务，确保 loadNetwork 完成后再拍快照
-  setTimeout(() => takeSnapshot(), 0)
-})
+// 首次加载后由 loadNetwork 内部调用 takeSnapshot()+inited=true
 
 // 切换Tab拦截
 watch(activeTab, (val, oldVal) => {
-  if (oldVal === undefined) { lastActiveTab = val; return }
-  if (!isDirty()) { lastActiveTab = val; return }
+  if (!inited.value) { lastActiveTab = val; return }
+  if (!(hasUserEdited.value && isDirty())) { lastActiveTab = val; return }
   // 有未保存更改，弹出确认
   Modal.confirm({
     title: '有未保存的更改',
@@ -293,6 +314,29 @@ window.addEventListener('beforeunload', (e) => {
 
 // 使用 history 拦截路由跳转（简单处理：由 Logs/其它菜单触发的跳转时也会提示）
 // 若项目中有 onBeforeRouteLeave 可替换为更优雅的路由守卫方式
+
+// ---- 实时应用 UI 窗口控制样式 ----
+async function applyUiMode() {
+  try {
+    // 立即通知当前窗口实时应用
+    window.dispatchEvent(new CustomEvent('ui-window-controls-mode', { detail: ui.value.windowControlsMode }))
+    // 持久化到全局配置
+    const payload = { global: { ui: { windowControlsMode: ui.value.windowControlsMode } } }
+    const res = await (window as any).api.invoke(IPC.ConfigSet, payload)
+    if (!res?.success) throw new Error(res?.message || '保存 UI 设置失败')
+  } catch (e:any) {
+    message.error(e?.message || '应用 UI 设置失败')
+  }
+}
+
+// 标记用户实际编辑过表单，避免刚进入页面切换Tab就弹窗
+onMounted(() => {
+  const root = document.querySelector('.settings-card') as HTMLElement | null
+  if (!root) return
+  const markEdited = () => { if (inited.value) hasUserEdited.value = true }
+  root.addEventListener('input', markEdited)
+  root.addEventListener('change', markEdited)
+})
 </script>
 
 <style scoped>
@@ -302,6 +346,14 @@ window.addEventListener('beforeunload', (e) => {
 .settings-subtitle { font-size: var(--text-base); color: var(--text-secondary); margin: 0; }
 .settings-content { width: 100%; }
 .settings-card { border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); padding: var(--spacing-xl); background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); }
+.settings-card :deep(.ant-tabs-left) { height: 100%; }
+.settings-card :deep(.ant-tabs) { height: 100%; }
+.settings-card :deep(.ant-tabs-nav) { height: 100%; }
+.settings-card :deep(.ant-tabs-tab) { white-space: nowrap; }
+.settings-card { min-height: calc(100vh - 40px - 120px); }
+.settings-card :deep(.ant-tabs-nav-more) { display: none !important; }
+.settings-card :deep(.ant-tabs-nav-wrap),
+.settings-card :deep(.ant-tabs-nav-list) { overflow: visible !important; }
 .settings-actions { display: flex; gap: var(--spacing-md); justify-content: center; margin-top: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--border-light); }
 .mirror-list { display: flex; flex-direction: column; gap: 8px; }
 .mirror-row { display: flex; gap: 8px; align-items: center; }

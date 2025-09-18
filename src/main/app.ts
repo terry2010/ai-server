@@ -53,6 +53,18 @@ function createWindow() {
       event.preventDefault()
     }
   })
+
+  // 广播窗口状态变更（最大化/还原）
+  const sendState = () => {
+    try {
+      const electronModule = require('electron')
+      const state = { isMaximized: win.isMaximized(), isFullScreen: win.isFullScreen() }
+      const wins = electronModule.BrowserWindow.getAllWindows()
+      for (const w of wins) w.webContents.send(require('./../shared/ipc-contract').IPC.WindowStateEvent, state)
+    } catch {}
+  }
+  win.on('maximize', sendState)
+  win.on('unmaximize', sendState)
 }
 
 app.whenReady().then(() => {

@@ -113,14 +113,14 @@ watch(() => route.name, (n) => {
 <style scoped>
 .side-menu {
   width: 240px;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 40px);
   padding: var(--spacing-lg);
   border-right: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   position: fixed;
   left: 0;
-  top: 60px;
+  top: 40px;
   z-index: 50;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
