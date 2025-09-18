@@ -65,6 +65,14 @@ function createWindow() {
   }
   win.on('maximize', sendState)
   win.on('unmaximize', sendState)
+  try {
+    const { BVManager } = require('./browserview/manager')
+    const resizeBV = () => { try { BVManager.resizeActive() } catch {} }
+    win.on('resize', resizeBV)
+    win.on('enter-full-screen', resizeBV)
+    win.on('leave-full-screen', resizeBV)
+    win.on('focus', resizeBV)
+  } catch {}
 }
 
 app.whenReady().then(() => {
@@ -90,6 +98,7 @@ app.whenReady().then(() => {
     } catch (e) {
       console.warn('[main] start docker events watcher failed', e);
     }
+    try { require('./ipc/browserview') } catch (e) { console.warn('[main] load browserview ipc failed', e) }
   } catch (e) {
     console.error('[main] failed to load ipc handlers:', e);
   }

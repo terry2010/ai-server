@@ -202,6 +202,7 @@
               <a-form-item label="顶部Tab顺序">
                 <a-space>
                   <a-button @click="resetTabOrderConfirm">重置顶部Tab顺序为默认</a-button>
+                  <a-button danger @click="releaseAllBvConfirm">释放模块页面缓存</a-button>
                 </a-space>
               </a-form-item>
 
@@ -227,7 +228,7 @@ import { ref, onMounted, watch } from 'vue'
 import { SaveOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { IPC } from '../../shared/ipc-contract'
-import { windowOpenDevTools, dockerStopAll, dockerRemoveAllContainers, dockerRemoveAllVolumes, dockerRemoveCustomNetwork, dockerNukeAll, getModuleStatus } from '../services/ipc'
+import { windowOpenDevTools, dockerStopAll, dockerRemoveAllContainers, dockerRemoveAllVolumes, dockerRemoveCustomNetwork, dockerNukeAll, getModuleStatus, bvRelease } from '../services/ipc'
 import { moduleStore } from '../stores/modules'
 
 const activeTab = ref('system')
@@ -418,6 +419,17 @@ function resetTabOrderConfirm() {
       } catch (e:any) {
         message.error(e?.message || '重置失败')
       }
+    }
+  })
+}
+
+function releaseAllBvConfirm() {
+  Modal.confirm({
+    title: '释放模块页面缓存',
+    content: '将销毁所有模块的 BrowserView，下次进入模块会重新加载页面。是否继续？',
+    okText: '释放',
+    onOk: async () => {
+      try { await bvRelease(); message.success('已释放模块页面缓存') } catch (e:any) { message.error(e?.message || '释放失败') }
     }
   })
 }

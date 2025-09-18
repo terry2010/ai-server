@@ -90,6 +90,41 @@ export async function dockerNukeAll(): Promise<void> {
   if (!res?.success) throw new Error(res?.message || '一键清理失败')
 }
 
+// ---- BrowserView 控制 ----
+export async function bvShow(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVShow, { name })
+  if (!res?.success) throw new Error(res?.message || '显示 BrowserView 失败')
+}
+export async function bvRefresh(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVRefresh, { name })
+  if (!res?.success) throw new Error(res?.message || '刷新 BrowserView 失败')
+}
+export async function bvHideAll(): Promise<void> {
+  const res = await invoke(IPC.BVHideAll)
+  if (!res?.success) throw new Error(res?.message || '隐藏 BrowserView 失败')
+}
+export async function bvRelease(name?: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVRelease, name ? { name } : undefined)
+  if (!res?.success) throw new Error(res?.message || '释放 BrowserView 失败')
+}
+export async function bvSetInsets(p: Partial<{ top: number; left: number; right: number; bottom: number }>): Promise<void> {
+  const res = await invoke(IPC.BVSetInsets, p)
+  if (!res?.success) throw new Error(res?.message || '设置 BrowserView 边距失败')
+}
+
+export async function bvGoBack(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVGoBack, { name })
+  if (!res?.success) throw new Error(res?.message || '后退失败')
+}
+export async function bvGoForward(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVGoForward, { name })
+  if (!res?.success) throw new Error(res?.message || '前进失败')
+}
+export async function openExternal(url: string): Promise<void> {
+  const res = await invoke(IPC.OpenExternal, { url })
+  if (!res?.success) throw new Error(res?.message || '调用系统浏览器失败')
+}
+
 // Docker 状态/启动
 export async function dockerCheck(): Promise<{ installed: boolean; running: boolean }> {
   const res = await invoke(IPC.DockerCheck)

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import WebAppView from '../views/WebAppView.vue'
+import { bvShow, bvHideAll } from '../services/ipc'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -57,3 +58,11 @@ const router = createRouter({
 })
 
 export default router
+
+// 路由切换后联动 BrowserView 显示/隐藏
+router.afterEach((to) => {
+  const name = String(to.name || '').toLowerCase()
+  const mods = ['n8n','dify','oneapi','ragflow']
+  if (mods.includes(name)) bvShow(name as any)
+  else bvHideAll()
+})
