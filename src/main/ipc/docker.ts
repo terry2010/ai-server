@@ -1,9 +1,39 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain } from 'electron';
 import { IPC, type IpcResponse } from '../../shared/ipc-contract';
 import { dockerRunning } from '../docker/utils';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import path from 'node:path';
+
+function getDocker(): any | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Docker = require('dockerode');
+    const isWin = process.platform === 'win32';
+    return isWin ? new Docker({ socketPath: '//./pipe/docker_engine' }) : new Docker({ socketPath: '/var/run/docker.sock' });
+  } catch {
+    return null;
+  }
+}
+
+const VOLUME_NAMES = [
+  'ai-server-mysql-data',
+  'ai-server-redis-data',
+  'ai-server-minio-data',
+  'ai-server-es-data',
+  'ai-server-postgres-data',
+  'ai-server-logs',
+];
+const NETWORK_NAME = 'ai-server-net';
+const CONTAINER_KEYWORDS = ['ai-server', 'n8n', 'dify', 'oneapi', 'ragflow', 'postgres', 'mysql', 'redis', 'minio', 'qdrant', 'es', 'elasticsearch'];
+
+function isRelatedContainer(info: any): boolean {
+  const name = (info?.Names?.[0] || info?.Name || '').toLowerCase();
+  if (name && CONTAINER_KEYWORDS.some(k => name.includes(k))) return true;
+  // 检查网络
+  const networks = info?.NetworkSettings?.Networks || {};
+  if (Object.prototype.hasOwnProperty.call(networks, NETWORK_NAME)) return true;
+  return false;
+}
 
 ipcMain.handle(IPC.DockerCheck, async () => {
   // 使用 dockerode 尝试连接来判断是否“可用/运行”
@@ -25,6 +55,111 @@ ipcMain.handle(IPC.DockerStart, async (): Promise<IpcResponse> => {
     }
     // 其他平台或未找到：提示手动启动
     return { success: false, message: '请手动启动 Docker Desktop 后重试' };
+  } catch (e: any) {
+    return { success: false, message: e?.message || String(e) };
+  }
+});
+
+// 停止所有相关容器
+ipcMain.handle(IPC.DockerStopAll, async (): Promise<IpcResponse> => {
+  const docker = getDocker();
+  if (!docker) return { success: false, message: 'Docker 不可用' };
+  try {
+    const list = await docker.listContainers({ all: true });
+    for (const c of list) {
+      if (!isRelatedContainer(c)) continue;
+      if (c.State === 'running') {
+        try { await docker.getContainer(c.Id).stop({ t: 10 }); } catch {}
+      }
+    }
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e?.message || String(e) };
+  }
+});
+
+// 删除所有相关容器
+ipcMain.handle(IPC.DockerRemoveAllContainers, async (): Promise<IpcResponse> => {
+  const docker = getDocker();
+  if (!docker) return { success: false, message: 'Docker 不可用' };
+  try {
+    const list = await docker.listContainers({ all: true });
+    for (const c of list) {
+      if (!isRelatedContainer(c)) continue;
+      try { await docker.getContainer(c.Id).remove({ force: true }); } catch {}
+    }
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e?.message || String(e) };
+  }
+});
+
+// 删除所有数据卷
+ipcMain.handle(IPC.DockerRemoveAllVolumes, async (): Promise<IpcResponse> => {
+  const docker = getDocker();
+  if (!docker) return { success: false, message: 'Docker 不可用' };
+  try {
+    const vinfo = await docker.listVolumes();
+    const vols: any[] = (vinfo?.Volumes || []);
+    for (const v of vols) {
+      const name = String(v?.Name || '');
+      if (VOLUME_NAMES.includes(name)) {
+        try { await docker.getVolume(name).remove({ force: true }); } catch {}
+      }
+    }
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e?.message || String(e) };
+  }
+});
+
+// 删除自定义网络
+ipcMain.handle(IPC.DockerRemoveCustomNetwork, async (): Promise<IpcResponse> => {
+  const docker = getDocker();
+  if (!docker) return { success: false, message: 'Docker 不可用' };
+  try {
+    const nets = await docker.listNetworks();
+    const target = nets.find((n: any) => n?.Name === NETWORK_NAME);
+    if (target) {
+      try { await docker.getNetwork(target.Id).remove(); } catch {}
+    }
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, message: e?.message || String(e) };
+  }
+});
+
+// 一键清理
+ipcMain.handle(IPC.DockerNukeAll, async (): Promise<IpcResponse> => {
+  const docker = getDocker();
+  if (!docker) return { success: false, message: 'Docker 不可用' };
+  try {
+    // 停止容器
+    await (async () => {
+      const list = await docker.listContainers({ all: true });
+      for (const c of list) {
+        if (!isRelatedContainer(c)) continue;
+        if (c.State === 'running') { try { await docker.getContainer(c.Id).stop({ t: 10 }); } catch {} }
+      }
+    })();
+    // 删除容器
+    await (async () => {
+      const list = await docker.listContainers({ all: true });
+      for (const c of list) { if (!isRelatedContainer(c)) continue; try { await docker.getContainer(c.Id).remove({ force: true }); } catch {} }
+    })();
+    // 删除卷
+    await (async () => {
+      const vinfo = await docker.listVolumes();
+      const vols: any[] = (vinfo?.Volumes || []);
+      for (const v of vols) { const name = String(v?.Name || ''); if (VOLUME_NAMES.includes(name)) { try { await docker.getVolume(name).remove({ force: true }); } catch {} } }
+    })();
+    // 删除网络
+    await (async () => {
+      const nets = await docker.listNetworks();
+      const target = nets.find((n: any) => n?.Name === NETWORK_NAME);
+      if (target) { try { await docker.getNetwork(target.Id).remove(); } catch {} }
+    })();
+    return { success: true };
   } catch (e: any) {
     return { success: false, message: e?.message || String(e) };
   }

@@ -43,6 +43,7 @@
     }
   },
   "dependencies": {
+    "sortablejs": "^1.15.3",
     "@ant-design/icons-vue": "^7.0.0",
     "ant-design-vue": "^4.0.0",
     "dockerode": "^4.0.8",
@@ -52,6 +53,7 @@
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
+    "@types/sortablejs": "^1.15.8",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "@vitejs/plugin-vue": "^5.0.0",

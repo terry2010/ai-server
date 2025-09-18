@@ -68,6 +68,28 @@ export const windowOpenDevTools = async (): Promise<void> => {
   if (!res?.success) throw new Error(res?.message || '打开调试窗口失败')
 }
 
+// ---- Docker 维护 ----
+export async function dockerStopAll(): Promise<void> {
+  const res = await invoke(IPC.DockerStopAll)
+  if (!res?.success) throw new Error(res?.message || '停止容器失败')
+}
+export async function dockerRemoveAllContainers(): Promise<void> {
+  const res = await invoke(IPC.DockerRemoveAllContainers)
+  if (!res?.success) throw new Error(res?.message || '删除容器失败')
+}
+export async function dockerRemoveAllVolumes(): Promise<void> {
+  const res = await invoke(IPC.DockerRemoveAllVolumes)
+  if (!res?.success) throw new Error(res?.message || '删除卷失败')
+}
+export async function dockerRemoveCustomNetwork(): Promise<void> {
+  const res = await invoke(IPC.DockerRemoveCustomNetwork)
+  if (!res?.success) throw new Error(res?.message || '删除网络失败')
+}
+export async function dockerNukeAll(): Promise<void> {
+  const res = await invoke(IPC.DockerNukeAll)
+  if (!res?.success) throw new Error(res?.message || '一键清理失败')
+}
+
 // Docker 状态/启动
 export async function dockerCheck(): Promise<{ installed: boolean; running: boolean }> {
   const res = await invoke(IPC.DockerCheck)

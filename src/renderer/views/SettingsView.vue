@@ -198,6 +198,22 @@
               <a-form-item>
                 <a-button type="primary" @click="windowOpenDevTools">打开调试窗口</a-button>
               </a-form-item>
+
+              <a-form-item label="顶部Tab顺序">
+                <a-space>
+                  <a-button @click="resetTabOrderConfirm">重置顶部Tab顺序为默认</a-button>
+                </a-space>
+              </a-form-item>
+
+              <a-divider />
+              <a-alert type="error" show-icon message="Docker 危险操作（请谨慎使用）" style="margin-bottom: 12px;" />
+              <div class="debug-actions">
+                <a-button @click="confirmStopAll" danger>停止所有容器</a-button>
+                <a-button @click="confirmRemoveAllContainers" danger>删除所有容器</a-button>
+                <a-button @click="confirmRemoveAllVolumes" danger>清空所有数据卷</a-button>
+                <a-button @click="confirmRemoveNetwork" danger>删除自定义网络</a-button>
+                <a-button type="primary" danger @click="confirmNukeAll">一键清理（停容器→删容器→删卷→删网络）</a-button>
+              </div>
             </a-form>
           </a-tab-pane>
         </a-tabs>
@@ -211,7 +227,8 @@ import { ref, onMounted, watch } from 'vue'
 import { SaveOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { IPC } from '../../shared/ipc-contract'
-import { windowOpenDevTools } from '../services/ipc'
+import { windowOpenDevTools, dockerStopAll, dockerRemoveAllContainers, dockerRemoveAllVolumes, dockerRemoveCustomNetwork, dockerNukeAll, getModuleStatus } from '../services/ipc'
+import { moduleStore } from '../stores/modules'
 
 const activeTab = ref('system')
 let lastActiveTab = 'system'
@@ -329,6 +346,82 @@ async function applyUiMode() {
   }
 }
 
+// ---- Docker 维护：带二次确认 ----
+function confirmStopAll() {
+  Modal.confirm({
+    title: '停止所有容器',
+    content: '确认停止所有 AI-Server 相关容器？',
+    okText: '停止',
+    okButtonProps: { danger: true },
+    onOk: async () => { await dockerStopAll(); await refreshModuleStatus(); message.success('已停止相关容器') },
+  })
+}
+function confirmRemoveAllContainers() {
+  Modal.confirm({
+    title: '删除所有容器',
+    content: '确认删除所有 AI-Server 相关容器？（不可恢复）',
+    okText: '删除',
+    okButtonProps: { danger: true },
+    onOk: async () => { await dockerRemoveAllContainers(); await refreshModuleStatus(); message.success('已删除相关容器') },
+  })
+}
+function confirmRemoveAllVolumes() {
+  Modal.confirm({
+    title: '清空所有数据卷',
+    content: '将删除 ai-server-* 相关命名卷，数据将不可恢复。是否继续？',
+    okText: '清空数据卷',
+    okButtonProps: { danger: true },
+    onOk: async () => { await dockerRemoveAllVolumes(); await refreshModuleStatus(); message.success('已清空数据卷') },
+  })
+}
+function confirmRemoveNetwork() {
+  Modal.confirm({
+    title: '删除自定义网络',
+    content: '将删除网络 ai-server-net，是否继续？',
+    okText: '删除网络',
+    okButtonProps: { danger: true },
+    onOk: async () => { await dockerRemoveCustomNetwork(); message.success('已删除自定义网络') },
+  })
+}
+function confirmNukeAll() {
+  Modal.confirm({
+    title: '一键清理（危险操作）',
+    content: '将停止并删除所有容器、清空数据卷并删除网络。此操作不可恢复，是否继续？',
+    okText: '我已知晓风险，继续',
+    okButtonProps: { danger: true },
+    onOk: async () => { await dockerNukeAll(); await refreshModuleStatus(); message.success('已完成一键清理') },
+  })
+}
+
+async function refreshModuleStatus() {
+  const names = ['n8n','dify','oneapi','ragflow']
+  for (const n of names) {
+    try {
+      const resp = await getModuleStatus(n as any)
+      const st = (resp as any)?.status
+      ;(moduleStore.dots as any)[n] = st === 'parse_error' ? 'error' : (st || 'stopped')
+    } catch {}
+  }
+  // 触发一次 UI 刷新
+  try { window.dispatchEvent(new CustomEvent('modules-status-refreshed')) } catch {}
+}
+
+function resetTabOrderConfirm() {
+  Modal.confirm({
+    title: '重置顶部Tab顺序',
+    content: '将恢复为默认顺序：n8n、Dify、OneAPI、RagFlow。是否继续？',
+    okText: '重置',
+    onOk: async () => {
+      try {
+        window.dispatchEvent(new CustomEvent('ui-reset-tab-order'))
+        message.success('已重置为默认顺序')
+      } catch (e:any) {
+        message.error(e?.message || '重置失败')
+      }
+    }
+  })
+}
+
 // 标记用户实际编辑过表单，避免刚进入页面切换Tab就弹窗
 onMounted(() => {
   const root = document.querySelector('.settings-card') as HTMLElement | null
@@ -364,6 +457,7 @@ onMounted(() => {
 @media (max-width: 768px) { .settings-view { padding: var(--spacing-lg); } .settings-actions { flex-direction: column; } .settings-actions .ant-btn { width: 100%; } }
 
 .action-button { border-radius: var(--radius-md); font-weight: 500; transition: all var(--transition-base); font-size: var(--text-sm); height: 36px; position: relative; overflow: hidden; }
+.debug-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .action-button::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent); transition: left 0.5s; }
 .action-button:hover::before { left: 100%; }
 .action-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }

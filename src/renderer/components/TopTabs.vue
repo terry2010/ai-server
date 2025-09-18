@@ -25,35 +25,19 @@
         @change="handleTabChange"
       >
         <a-tab-pane key="home" tab="首页" />
-        <a-tab-pane key="n8n">
+        <a-tab-pane v-for="mod in moduleTabs" :key="mod">
           <template #tab>
-            <span class="tab-content">
-              n8n
-              <span :class="['status-indicator', getStatusClass('n8n')]"></span>
-            </span>
-          </template>
-        </a-tab-pane>
-        <a-tab-pane key="dify">
-          <template #tab>
-            <span class="tab-content">
-              Dify
-              <span :class="['status-indicator', getStatusClass('dify')]"></span>
-            </span>
-          </template>
-        </a-tab-pane>
-        <a-tab-pane key="oneapi">
-          <template #tab>
-            <span class="tab-content">
-              OneAPI
-              <span :class="['status-indicator', getStatusClass('oneapi')]"></span>
-            </span>
-          </template>
-        </a-tab-pane>
-        <a-tab-pane key="ragflow">
-          <template #tab>
-            <span class="tab-content">
-              RagFlow
-              <span :class="['status-indicator', getStatusClass('ragflow')]"></span>
+            <span :class="['tab-content', { 'drag-over': dragOverKey===mod }]"
+                  :data-mod="mod"
+                  :draggable="true"
+                  @dragstart.stop="onDragStart(mod, $event)"
+                  @dragenter.prevent="onDragEnter(mod)"
+                  @dragover.prevent="onDragOver"
+                  @dragleave.prevent="onDragLeave(mod)"
+                  @drop.stop.prevent="onDrop(mod, $event)"
+            >
+              {{ getTabLabel(mod) }}
+              <span :class="['status-indicator', getStatusClass(mod)]"></span>
             </span>
           </template>
         </a-tab-pane>
@@ -117,6 +101,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import Sortable from 'sortablejs'
 import { useRouter, useRoute } from 'vue-router'
 import { moduleStore } from '../stores/modules'
 import { getModuleStatus } from '../services/ipc'
@@ -138,6 +123,8 @@ import {
 const router = useRouter()
 const route = useRoute()
 const activeTab = ref('home')
+const defaultModules = ['n8n','dify','oneapi','ragflow'] as const
+const moduleTabs = ref<string[]>([...defaultModules])
 const showMenu = ref(false)
 const menuBtn = ref<HTMLElement | null>(null)
 const isMaximized = ref(false)
@@ -164,7 +151,7 @@ const handleTabChange = (key: string) => {
 function syncTabWithRoute() {
   const name = (route.name as string) || ''
   const lower = name.toLowerCase()
-  if (['home','n8n','dify','oneapi','ragflow'].includes(lower)) {
+  if (['home', ...moduleTabs.value].includes(lower)) {
     activeTab.value = lower === '' ? 'home' : lower
   }
 }
@@ -202,6 +189,13 @@ onMounted(() => {
     try {
       const mode = res?.data?.ui?.windowControlsMode
       windowControlsMode.value = (mode === 'mac' || mode === 'windows' || mode === 'all') ? mode : 'all'
+      const order = res?.data?.ui?.tabOrder
+      if (Array.isArray(order)) {
+        const valid = order.filter((k: any) => defaultModules.includes(k))
+        // 追加漏掉的模块
+        const merged = Array.from(new Set([...(valid as string[]), ...defaultModules]))
+        moduleTabs.value = merged
+      }
     } catch {}
   }).catch(() => {})
   // 监听设置页实时事件
@@ -238,8 +232,15 @@ onMounted(async () => {
       ;(moduleStore.dots as any)[n] = st === 'parse_error' ? 'error' : (st || 'stopped')
     } catch {}
   }
+  // 初始化 Sortable 拖拽
+  setTimeout(initSortable, 0)
+  // 监听重置顺序事件
+  window.addEventListener('ui-reset-tab-order', resetTabOrder)
 })
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
+onBeforeUnmount(() => {
+  try { window.removeEventListener('ui-reset-tab-order', resetTabOrder) } catch {}
+})
 
 const handleUserMenuClick = ({ key }: { key: string }) => {
   switch (key) {
@@ -260,6 +261,84 @@ const handleClose = () => { windowClose() }
 const handleMinimize = () => { windowMinimize() }
 const handleMaximize = () => { windowMaximize() }
 const handleMenu = () => { /* 示例菜单通过 a-dropdown 在右侧 user-section 已体现 */ }
+
+// --- 拖拽排序 ---
+let dragKey: string | null = null
+const dragOverKey = ref<string | null>(null)
+function onDragStart(key: string, ev: DragEvent) {
+  dragKey = key
+  try {
+    ev.dataTransfer?.setData('text/plain', key)
+    if (ev.dataTransfer) { ev.dataTransfer.effectAllowed = 'move' }
+  } catch {}
+}
+function onDragEnter(key: string) { dragOverKey.value = key }
+function onDragLeave(key: string) { if (dragOverKey.value === key) dragOverKey.value = null }
+function onDragOver(ev: DragEvent) { try { if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move' } catch {} }
+function onDrop(targetKey: string, _ev: DragEvent) {
+  if (!dragKey || dragKey === targetKey) return
+  const arr = moduleTabs.value.slice()
+  const from = arr.indexOf(dragKey)
+  const to = arr.indexOf(targetKey)
+  if (from === -1 || to === -1) { dragKey = null; return }
+  arr.splice(to, 0, ...arr.splice(from, 1))
+  moduleTabs.value = arr
+  dragKey = null
+  dragOverKey.value = null
+  // 持久化
+  try {
+    (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: moduleTabs.value } } })
+  } catch {}
+}
+
+function getTabLabel(k: string): string {
+  if (k === 'n8n') return 'n8n'
+  if (k === 'dify') return 'Dify'
+  if (k === 'oneapi') return 'OneAPI'
+  if (k === 'ragflow') return 'RagFlow'
+  return k
+}
+
+// 使用 Sortable 直接对 Ant Tabs 的 nav 列表启用拖拽
+let sortable: Sortable | null = null
+function initSortable() {
+  try {
+    const list = document.querySelector('.custom-tabs .ant-tabs-nav-list') as HTMLElement | null
+    if (!list || sortable) return
+    sortable = Sortable.create(list, {
+      animation: 150,
+      draggable: '.ant-tabs-tab',
+      onMove(evt: any) {
+        const dragged = evt.dragged as HTMLElement
+        const related = evt.related as HTMLElement | null
+        // 禁止拖动首页（第一个）或放到首页前面
+        if (dragged && dragged.parentElement && dragged.parentElement.firstElementChild === dragged) return false
+        if (related && related.parentElement && related.parentElement.firstElementChild === related) return false
+        return true
+      },
+      onEnd() {
+        const listEl = sortable!.el as HTMLElement
+        const items = Array.from(listEl.querySelectorAll('.ant-tabs-tab')) as HTMLElement[]
+        // 跳过第一个（首页），读取每个 tab 内部 .tab-content 的 data-mod
+        const keys: string[] = []
+        items.slice(1).forEach(li => {
+          const span = li.querySelector('.tab-content') as HTMLElement | null
+          const mod = span?.dataset?.mod
+          if (mod) keys.push(mod)
+        })
+        if (keys.length === moduleTabs.value.length) {
+          moduleTabs.value = keys
+          try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: moduleTabs.value } } }) } catch {}
+        }
+      }
+    })
+  } catch {}
+}
+
+function resetTabOrder() {
+  moduleTabs.value = [...defaultModules]
+  try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: moduleTabs.value } } }) } catch {}
+}
 </script>
 
 <style scoped>
@@ -327,6 +406,8 @@ const handleMenu = () => { /* 示例菜单通过 a-dropdown 在右侧 user-secti
 .custom-tabs :deep(.ant-tabs-ink-bar) { display: none; }
 
 .tab-content { display: flex; align-items: center; gap: var(--spacing-sm); }
+.tab-content[draggable="true"] { cursor: grab; user-select: none; }
+.tab-content.drag-over { outline: 2px dashed rgba(0,0,0,0.2); border-radius: 8px; }
 .status-indicator { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .status-running { background-color: var(--success-color); animation: pulse 2s infinite; box-shadow: 0 0 4px var(--success-color); }
 .status-stopped { background-color: var(--text-tertiary); }
