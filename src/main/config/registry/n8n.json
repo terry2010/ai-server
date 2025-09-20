@@ -3,12 +3,39 @@
   "type": "feature",
   "dependsOn": ["postgres", "redis"],
   "ports": [
-    { "container": 5678, "host": "${N8N_PORT:18100}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+    { "container": 5678, "host": "${N8N_HOST_PORT:18100}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
   ],
   "variables": {
-    "N8N_PORT": "${N8N_PORT:18100}",
+    "N8N_PORT": "${N8N_PORT:5678}",
+    "N8N_HOST_PORT": "${N8N_HOST_PORT:18100}",
     "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}"
   },
-  "healthCheck": { "type": "http", "target": "http://localhost:${N8N_PORT:18100}/", "interval": 2000, "timeout": 20000, "retries": 30 },
-  "compose": { "templateRef": "docker-compose.feature.yml" }
+  "healthCheck": { "type": "http", "target": "http://localhost:${N8N_HOST_PORT:18100}/", "interval": 2000, "timeout": 20000, "retries": 30 },
+  "compose": {
+    "templateRef": "docker-compose.feature.yml",
+    "fragment": {
+      "services": {
+        "n8n": {
+          "container_name": "ai-n8n",
+          "image": "n8nio/n8n:latest",
+          "restart": "unless-stopped",
+          "environment": [
+            "N8N_PORT=${N8N_PORT:5678}",
+            "N8N_HOST=0.0.0.0"
+          ],
+          "ports": [
+            { "target": "${N8N_PORT:5678}", "published": "${N8N_HOST_PORT:18100}", "protocol": "tcp", "host_ip": "${BIND_ADDRESS:127.0.0.1}" }
+          ],
+          "networks": [
+            "ai-server-net"
+          ]
+        }
+      },
+      "networks": {
+        "ai-server-net": {
+          "external": true
+        }
+      }
+    }
+  }
 }
