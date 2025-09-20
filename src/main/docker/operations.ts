@@ -119,17 +119,21 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
   if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `模块未就绪: ${name}` }
   emitOps(`self ${name} ready`)
 
-  // 可选伴随服务：在不引入依赖环的前提下，点击 dify 时自动拉起 dify-web
+  // 可选伴随服务：在不引入依赖环的前提下，点击 dify 时自动拉起 dify-web / dify-plugin
   try {
     if (name === 'dify') {
       const web = modules.find(m => m.name === 'dify-web') as ModuleSchema | undefined
       if (web) {
         console.info('[ops] ensure companion', 'dify-web')
         emitOps('ensure companion dify-web')
-        await createOrStartContainerForModule(web)
-        // web 的健康检查按自身配置执行
-        const webOk = await waitHealth((web as any).healthCheck)
-        emitOps(`companion dify-web ${webOk ? 'ready' : 'not ready'}`)
+        // 不等待健康检查，避免卡住主流程
+        createOrStartContainerForModule(web).catch(e => console.warn('[ops] start dify-web failed', e?.message || e))
+      }
+      const plugin = modules.find(m => m.name === 'dify-plugin') as ModuleSchema | undefined
+      if (plugin) {
+        console.info('[ops] ensure companion', 'dify-plugin')
+        emitOps('ensure companion dify-plugin')
+        createOrStartContainerForModule(plugin).catch(e => console.warn('[ops] start dify-plugin failed', e?.message || e))
       }
     }
   } catch (e: any) {
@@ -225,16 +229,23 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
   emitStdout(sender, streamId, `[debug] health ${name}=${ok}`)
   if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `模块未就绪: ${name}` }
 
-  // 可选伴随服务：dify 启动后尝试启动 dify-web
+  // 可选伴随服务：dify 启动后尝试启动 dify-web / dify-plugin（不阻塞主流程）
   try {
     if (name === 'dify') {
       const reg = loadRegistry()
       const web = (reg.modules || []).find(m => m.name === 'dify-web') as ModuleSchema | undefined
       if (web) {
         emitStdout(sender, streamId, `[debug] ensure companion dify-web`)
-        await createOrStartContainerForModule(web)
-        const webOk = await waitHealth((web as any).healthCheck)
-        emitStdout(sender, streamId, `[debug] health dify-web=${webOk}`)
+        createOrStartContainerForModule(web)
+          .then(() => emitStdout(sender, streamId, `[debug] started dify-web`))
+          .catch(e => emitStdout(sender, streamId, `[debug] start dify-web error: ${String(e?.message || e)}`))
+      }
+      const plugin = (reg.modules || []).find(m => m.name === 'dify-plugin') as ModuleSchema | undefined
+      if (plugin) {
+        emitStdout(sender, streamId, `[debug] ensure companion dify-plugin`)
+        createOrStartContainerForModule(plugin)
+          .then(() => emitStdout(sender, streamId, `[debug] started dify-plugin`))
+          .catch(e => emitStdout(sender, streamId, `[debug] start dify-plugin error: ${String(e?.message || e)}`))
       }
     }
   } catch (e: any) {

@@ -102,7 +102,15 @@ async function refreshStatus() {
     // 查询真实状态
     const full = await Promise.all(picked.map(async (name) => {
       const st = await getModuleStatus(name)
-      const port = extractFirstHostPort(st.ports)
+      let port = extractFirstHostPort(st.ports)
+      // 对于 dify，优先显示 dify-web 的端口（18090）
+      if (name === 'dify') {
+        try {
+          const stWeb = await getModuleStatus('dify-web' as any)
+          const portWeb = extractFirstHostPort((stWeb as any)?.ports || {})
+          if (portWeb) port = portWeb
+        } catch {}
+      }
       const status = (st.status === 'parse_error' ? 'error' : st.status) as 'running'|'stopped'|'error'
       const card: Card = {
         serviceName: name === 'dify' ? 'Dify' : name === 'oneapi' ? 'OneAPI' : name === 'ragflow' ? 'RagFlow' : 'n8n',
@@ -192,7 +200,7 @@ onMounted(async () => {
 
   // 2) 订阅事件驱动更新（主进程在 start/stop 成功后会广播）
   try {
-    onStatus = (_e: any, payload: any) => {
+    onStatus = async (_e: any, payload: any) => {
       const name = String(payload?.name || '').toLowerCase() as ServiceType
       const resp = payload?.status
       if (!name || !resp?.success) return
@@ -205,7 +213,14 @@ onMounted(async () => {
         }
       } catch {}
       const idx = services.value.findIndex(s => s.serviceType === name)
-      const port = extractFirstHostPort(st.ports || {})
+      let port = extractFirstHostPort(st.ports || {})
+      if (name === 'dify') {
+        try {
+          const stWeb = await getModuleStatus('dify-web' as any)
+          const portWeb = extractFirstHostPort((stWeb as any)?.ports || {})
+          if (portWeb) port = portWeb
+        } catch {}
+      }
       const status = (st.status === 'parse_error' ? 'error' : st.status) as 'running'|'stopped'|'error'
       const card: Card = {
         serviceName: name === 'dify' ? 'Dify' : name === 'oneapi' ? 'OneAPI' : name === 'ragflow' ? 'RagFlow' : 'n8n',
