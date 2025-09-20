@@ -9,10 +9,10 @@
   "env": {
     "PORT": "3000",
     "HOSTNAME": "0.0.0.0",
-    "NEXT_PUBLIC_API_PREFIX": "http://host.docker.internal:${DIFY_API_PORT:18091}/console/api",
-    "NEXT_PUBLIC_PUBLIC_API_PREFIX": "http://host.docker.internal:${DIFY_API_PORT:18091}/api",
-    "CONSOLE_API_URL": "http://host.docker.internal:${DIFY_API_PORT:18091}",
-    "APP_API_URL": "http://host.docker.internal:${DIFY_API_PORT:18091}"
+    "NEXT_PUBLIC_API_PREFIX": "http://localhost:${DIFY_API_PORT:18091}/console/api",
+    "NEXT_PUBLIC_PUBLIC_API_PREFIX": "http://localhost:${DIFY_API_PORT:18091}/api",
+    "CONSOLE_API_URL": "http://localhost:${DIFY_API_PORT:18091}",
+    "APP_API_URL": "http://localhost:${DIFY_API_PORT:18091}"
   },
   "variables": {
     "DIFY_WEB_PORT": "${DIFY_WEB_PORT:18090}",
