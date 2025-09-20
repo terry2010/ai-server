@@ -28,7 +28,7 @@ function resolveImage(mod: ModuleSchema): string | undefined {
     case 'elasticsearch': return applyRegistryMirror('docker.io/library/elasticsearch:8.14.3')
     case 'n8n': return applyRegistryMirror('n8nio/n8n:latest')
     case 'oneapi': return applyRegistryMirror('justsong/one-api:latest')
-    case 'dify': return applyRegistryMirror('langgenius/dify:latest')
+    case 'dify': return applyRegistryMirror('langgenius/dify-api:latest')
     case 'ragflow': return applyRegistryMirror('python:3.11-slim')
     default:
       return undefined
@@ -108,8 +108,6 @@ function resolveCommand(mod: ModuleSchema): string[] | undefined {
     case 'minio':
       return ['server', '/data', '--console-address', ':9001']
     case 'ragflow':
-      return ['sleep', 'infinity']
-    case 'dify':
       return ['sleep', 'infinity']
     default:
       return undefined

@@ -29,8 +29,18 @@ class BrowserViewManager {
 
     // 解析模块 URL
     try {
-      const st = await getModuleStatus(name as any)
-      const url = this.extractFirstHttpUrl(st.data?.ports || {})
+      let url = ''
+      // 优先：如果是 dify，尽量显示 dify-web 的端口（web 页面）
+      if (name === 'dify') {
+        try {
+          const stWeb = await getModuleStatus('dify-web' as any)
+          url = this.extractFirstHttpUrl((stWeb as any)?.data?.ports || {})
+        } catch {}
+      }
+      if (!url) {
+        const st = await getModuleStatus(name as any)
+        url = this.extractFirstHttpUrl(st.data?.ports || {})
+      }
       if (url) await v.webContents.loadURL(url)
     } catch {}
     return v
@@ -121,8 +131,17 @@ class BrowserViewManager {
 
   async loadHome(name: ModuleKey) {
     try {
-      const st = await getModuleStatus(name as any)
-      const url = this.extractFirstHttpUrl((st as any)?.data?.ports || (st as any)?.ports || {})
+      let url = ''
+      if (name === 'dify') {
+        try {
+          const stWeb = await getModuleStatus('dify-web' as any)
+          url = this.extractFirstHttpUrl((stWeb as any)?.data?.ports || (stWeb as any)?.ports || {})
+        } catch {}
+      }
+      if (!url) {
+        const st = await getModuleStatus(name as any)
+        url = this.extractFirstHttpUrl((st as any)?.data?.ports || (st as any)?.ports || {})
+      }
       return this.loadUrl(name, url)
     } catch {
       return { success: false }

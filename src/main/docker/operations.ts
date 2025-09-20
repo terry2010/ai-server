@@ -118,6 +118,23 @@ export async function startModule(name: ModuleName): Promise<IpcResponse> {
   const ok = skipHealthSelf ? true : await waitHealth((target as any).healthCheck)
   if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `模块未就绪: ${name}` }
   emitOps(`self ${name} ready`)
+
+  // 可选伴随服务：在不引入依赖环的前提下，点击 dify 时自动拉起 dify-web
+  try {
+    if (name === 'dify') {
+      const web = modules.find(m => m.name === 'dify-web') as ModuleSchema | undefined
+      if (web) {
+        console.info('[ops] ensure companion', 'dify-web')
+        emitOps('ensure companion dify-web')
+        await createOrStartContainerForModule(web)
+        // web 的健康检查按自身配置执行
+        const webOk = await waitHealth((web as any).healthCheck)
+        emitOps(`companion dify-web ${webOk ? 'ready' : 'not ready'}`)
+      }
+    }
+  } catch (e: any) {
+    console.warn('[ops] companion start error', e?.message || e)
+  }
   return { success: true, message: `start ${name} OK` }
 }
 
@@ -207,6 +224,22 @@ export async function startModuleStream(name: ModuleName, sender: WebContents, s
   const ok = skipHealthSelf ? true : await waitHealth((target as any).healthCheck)
   emitStdout(sender, streamId, `[debug] health ${name}=${ok}`)
   if (!ok) return { success: false, code: 'E_HEALTH_TIMEOUT', message: `模块未就绪: ${name}` }
+
+  // 可选伴随服务：dify 启动后尝试启动 dify-web
+  try {
+    if (name === 'dify') {
+      const reg = loadRegistry()
+      const web = (reg.modules || []).find(m => m.name === 'dify-web') as ModuleSchema | undefined
+      if (web) {
+        emitStdout(sender, streamId, `[debug] ensure companion dify-web`)
+        await createOrStartContainerForModule(web)
+        const webOk = await waitHealth((web as any).healthCheck)
+        emitStdout(sender, streamId, `[debug] health dify-web=${webOk}`)
+      }
+    }
+  } catch (e: any) {
+    emitStdout(sender, streamId, `[debug] companion dify-web error: ${String(e?.message || e)}`)
+  }
   return { success: true, message: `start ${name} OK` }
 }
 
