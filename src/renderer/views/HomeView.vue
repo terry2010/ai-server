@@ -5,6 +5,7 @@ import CarouselBanner from '../components/CarouselBanner.vue'
 import OverviewCard from '../components/OverviewCard.vue'
 import ServiceCard from '../components/ServiceCard.vue'
 import { listModules, getModuleStatus, dockerCheck } from '../services/ipc'
+import { opsStore, clearPending } from '../stores/ops'
 import { IPC } from '../../shared/ipc-contract'
 import { moduleStore } from '../stores/modules'
 
@@ -78,6 +79,8 @@ function extractFirstHostPort(portsRecord: Record<string, string>): string {
 }
 
 async function refreshStatus() {
+  if ((refreshStatus as any)._busy) return
+  ;(refreshStatus as any)._busy = true
   try {
     const mods = await listModules()
     const picked = mods
@@ -115,6 +118,15 @@ async function refreshStatus() {
     }))
     // 按预设顺序去重排序
     services.value = normalizeServices(full)
+    // 仅在达到目标状态时清除 pending（避免拉镜像阶段中断loading）
+    try {
+      for (const it of services.value) {
+        const p = opsStore.pending[it.serviceType as ServiceType]
+        if ((p === 'starting' && it.status === 'running') || (p === 'stopping' && it.status === 'stopped')) {
+          clearPending(it.serviceType as any)
+        }
+      }
+    } catch {}
     // 更新全局模块状态点与计数（基于规范化后的列表）
     moduleStore.total = services.value.length
     moduleStore.running = services.value.filter(f => f.status === 'running').length
@@ -130,6 +142,10 @@ async function refreshStatus() {
 }
 
 const route = useRoute()
+
+// 顶层持有事件处理器引用，便于在 onUnmounted 中清理
+let onStatus: ((...args:any[])=>void) | null = null
+let onFast: (()=>void) | null = null
 
 onMounted(async () => {
   // 1) 先用缓存渲染，避免每次进入首页都长时间 loading
@@ -176,11 +192,18 @@ onMounted(async () => {
 
   // 2) 订阅事件驱动更新（主进程在 start/stop 成功后会广播）
   try {
-    const onStatus = (_e: any, payload: any) => {
+    onStatus = (_e: any, payload: any) => {
       const name = String(payload?.name || '').toLowerCase() as ServiceType
       const resp = payload?.status
       if (!name || !resp?.success) return
       const st = resp.data as any
+      try {
+        const p = opsStore.pending[name as ServiceType]
+        const status = String(st.status || '')
+        if ((p === 'starting' && status === 'running') || (p === 'stopping' && status === 'stopped')) {
+          clearPending(name as any)
+        }
+      } catch {}
       const idx = services.value.findIndex(s => s.serviceType === name)
       const port = extractFirstHostPort(st.ports || {})
       const status = (st.status === 'parse_error' ? 'error' : st.status) as 'running'|'stopped'|'error'
@@ -204,13 +227,6 @@ onMounted(async () => {
       saveCache(services.value)
     }
     ;(window as any).api.on(IPC.ModuleStatusEvent, onStatus)
-    // 组件卸载时清理监听，避免 MaxListenersExceededWarning
-    onUnmounted(() => {
-      try {
-        (window as any).api.off?.(IPC.ModuleStatusEvent, onStatus)
-        ;(window as any).api.removeListener?.(IPC.ModuleStatusEvent, onStatus)
-      } catch {}
-    })
   } catch {}
 
   // 3) 再拉一次最新状态覆盖
@@ -228,21 +244,32 @@ onMounted(async () => {
   }
   setTimer()
   // 页面获得焦点/可见时，如果当前在首页，立即刷新一次，加速对命令行操作的反馈
-  const onFast = () => {
+  onFast = () => {
     const isHome = ((route.name as string) || '').toLowerCase() === 'home'
     if (isHome) refreshStatus()
   }
   window.addEventListener('focus', onFast)
   document.addEventListener('visibilitychange', onFast)
-  onUnmounted(() => {
-    window.removeEventListener('focus', onFast)
-    document.removeEventListener('visibilitychange', onFast)
-  })
   // 监听路由变化，动态调整频率
   watch(() => route.name, () => setTimer())
 })
 
-onUnmounted(() => { if (timer) window.clearInterval(timer) })
+// 统一的卸载清理（必须在顶层注册调用）
+onUnmounted(() => {
+  try {
+    if (onStatus) {
+      (window as any).api.off?.(IPC.ModuleStatusEvent, onStatus)
+      ;(window as any).api.removeListener?.(IPC.ModuleStatusEvent, onStatus)
+    }
+  } catch {}
+  try {
+    if (onFast) {
+      window.removeEventListener('focus', onFast)
+      document.removeEventListener('visibilitychange', onFast)
+    }
+  } catch {}
+  if (timer) window.clearInterval(timer)
+})
 
 async function handleRefresh() {
   try {

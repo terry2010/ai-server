@@ -97,6 +97,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { startModule, stopModule } from '../services/ipc'
+import { opsStore, setPending, clearPending } from '../stores/ops'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -120,9 +121,11 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const isBusy = ref(false)
+const actionBusy = ref(false)
 
 const isRunning = computed(() => props.status === 'running')
+const globalPending = computed(() => opsStore.pending[props.serviceType] !== null)
+const isBusy = computed(() => actionBusy.value || globalPending.value || props.status==='loading')
 const statusClass = computed(() => props.status === 'loading' ? 'status-loading' : `status-${props.status}`)
 
 const statusText = computed(() => {
@@ -158,26 +161,31 @@ const emit = defineEmits<{ 'status-changed': [] }>()
 const router = useRouter()
 
 const startService = async () => {
-  isBusy.value = true
+  actionBusy.value = true
+  setPending(props.serviceType, 'starting')
   try {
     await startModule(props.serviceType)
     emit('status-changed')
+    // 成功时：等待主进程的 ModuleStatusEvent 来清空全局 pending
   } catch (e) {
     console.error(e)
+    clearPending(props.serviceType) // 失败立即清空
   } finally {
-    isBusy.value = false
+    actionBusy.value = false
   }
 }
 
 const stopService = async () => {
-  isBusy.value = true
+  actionBusy.value = true
+  setPending(props.serviceType, 'stopping')
   try {
     await stopModule(props.serviceType)
     emit('status-changed')
   } catch (e) {
     console.error(e)
+    clearPending(props.serviceType)
   } finally {
-    isBusy.value = false
+    actionBusy.value = false
   }
 }
 

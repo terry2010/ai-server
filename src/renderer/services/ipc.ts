@@ -12,9 +12,17 @@ export async function listModules(): Promise<{ name: string; type: string }[]> {
 
 // 客户端（ops）日志历史
 export async function getClientOpsLogs(tail = 500): Promise<Array<{ id: string; timestamp: string; level: string; message: string }>> {
+  console.log('[ipc] getClientOpsLogs ->', { tail })
+  const t0 = performance.now()
   const res = await invoke(IPC.AppClientLogsGet, { tail })
-  if (!res?.success) throw new Error(res?.message || '读取客户端日志失败')
-  return res.data || []
+  const t1 = performance.now()
+  if (!res?.success) {
+    console.error('[ipc] getClientOpsLogs fail <-', res)
+    throw new Error(res?.message || '读取客户端日志失败')
+  }
+  const arr = res.data || []
+  console.log('[ipc] getClientOpsLogs ok <-', { count: arr.length, ms: Math.round(t1 - t0) })
+  return arr
 }
 
 export async function getModuleStatus(name: ModuleName): Promise<ModuleStatus> {
@@ -24,13 +32,23 @@ export async function getModuleStatus(name: ModuleName): Promise<ModuleStatus> {
 }
 
 export async function startModule(name: ModuleName) {
+  console.log('[ipc] startModule ->', name)
+  const t0 = performance.now()
   const res = await invoke(IPC.ModuleStart, { name })
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] startModule ok <-', name, `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] startModule fail <-', name, res)
   if (!res?.success) throw new Error(res?.message || `启动失败: ${name}`)
   return res
 }
 
 export async function stopModule(name: ModuleName) {
+  console.log('[ipc] stopModule ->', name)
+  const t0 = performance.now()
   const res = await invoke(IPC.ModuleStop, { name })
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] stopModule ok <-', name, `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] stopModule fail <-', name, res)
   if (!res?.success) throw new Error(res?.message || `停止失败: ${name}`)
   return res
 }
@@ -38,9 +56,17 @@ export async function stopModule(name: ModuleName) {
 export interface AppLogEntry { id: string; timestamp: string; service: string; module: string; moduleType: 'basic'|'feature'; level: 'error'|'warn'|'info'|'debug'|'log'; message: string }
 
 export async function getModuleLogs(params?: { name?: ModuleName; tail?: number }): Promise<AppLogEntry[]> {
+  console.log('[ipc] getModuleLogs ->', params)
+  const t0 = performance.now()
   const res = await invoke(IPC.ModuleLogs, params)
-  if (!res?.success) throw new Error(res?.message || '读取日志失败')
-  return (res.data?.entries || []) as AppLogEntry[]
+  const t1 = performance.now()
+  if (!res?.success) {
+    console.error('[ipc] getModuleLogs fail <-', params, res)
+    throw new Error(res?.message || '读取日志失败')
+  }
+  const entries = (res.data?.entries || []) as AppLogEntry[]
+  console.log('[ipc] getModuleLogs ok <-', { name: params?.name, count: entries.length, ms: Math.round(t1 - t0) })
+  return entries
 }
 
 // 实时日志 attach/detach
@@ -70,23 +96,48 @@ export const windowOpenDevTools = async (): Promise<void> => {
 
 // ---- Docker 维护 ----
 export async function dockerStopAll(): Promise<void> {
+  console.log('[ipc] dockerStopAll ->')
+  const t0 = performance.now()
   const res = await invoke(IPC.DockerStopAll)
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] dockerStopAll ok <-', `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] dockerStopAll fail <-', res)
   if (!res?.success) throw new Error(res?.message || '停止容器失败')
 }
 export async function dockerRemoveAllContainers(): Promise<void> {
+  console.log('[ipc] dockerRemoveAllContainers ->')
+  const t0 = performance.now()
   const res = await invoke(IPC.DockerRemoveAllContainers)
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] dockerRemoveAllContainers ok <-', `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] dockerRemoveAllContainers fail <-', res)
   if (!res?.success) throw new Error(res?.message || '删除容器失败')
 }
 export async function dockerRemoveAllVolumes(): Promise<void> {
+  console.log('[ipc] dockerRemoveAllVolumes ->')
+  const t0 = performance.now()
   const res = await invoke(IPC.DockerRemoveAllVolumes)
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] dockerRemoveAllVolumes ok <-', `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] dockerRemoveAllVolumes fail <-', res)
   if (!res?.success) throw new Error(res?.message || '删除卷失败')
 }
 export async function dockerRemoveCustomNetwork(): Promise<void> {
+  console.log('[ipc] dockerRemoveCustomNetwork ->')
+  const t0 = performance.now()
   const res = await invoke(IPC.DockerRemoveCustomNetwork)
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] dockerRemoveCustomNetwork ok <-', `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] dockerRemoveCustomNetwork fail <-', res)
   if (!res?.success) throw new Error(res?.message || '删除网络失败')
 }
 export async function dockerNukeAll(): Promise<void> {
+  console.log('[ipc] dockerNukeAll ->')
+  const t0 = performance.now()
   const res = await invoke(IPC.DockerNukeAll)
+  const t1 = performance.now()
+  if (res?.success) console.log('[ipc] dockerNukeAll ok <-', `(${Math.round(t1 - t0)}ms)`) 
+  else console.error('[ipc] dockerNukeAll fail <-', res)
   if (!res?.success) throw new Error(res?.message || '一键清理失败')
 }
 

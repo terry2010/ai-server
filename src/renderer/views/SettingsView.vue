@@ -230,6 +230,7 @@ import { message, Modal } from 'ant-design-vue'
 import { IPC } from '../../shared/ipc-contract'
 import { windowOpenDevTools, dockerStopAll, dockerRemoveAllContainers, dockerRemoveAllVolumes, dockerRemoveCustomNetwork, dockerNukeAll, getModuleStatus, bvRelease } from '../services/ipc'
 import { moduleStore } from '../stores/modules'
+import { clearAllPending } from '../stores/ops'
 
 const activeTab = ref('system')
 let lastActiveTab = 'system'
@@ -354,7 +355,14 @@ function confirmStopAll() {
     content: '确认停止所有 AI-Server 相关容器？',
     okText: '停止',
     okButtonProps: { danger: true },
-    onOk: async () => { await dockerStopAll(); await refreshModuleStatus(); message.success('已停止相关容器') },
+    onOk: async () => {
+      console.log('[settings] dockerStopAll ->')
+      await dockerStopAll()
+      // 停止所有容器后，清空所有模块 pending，避免首页loading残留
+      try { clearAllPending(); console.log('[settings] clearAllPending() done') } catch { console.warn('[settings] clearAllPending() failed') }
+      await refreshModuleStatus()
+      message.success('已停止相关容器')
+    },
   })
 }
 function confirmRemoveAllContainers() {
@@ -363,7 +371,13 @@ function confirmRemoveAllContainers() {
     content: '确认删除所有 AI-Server 相关容器？（不可恢复）',
     okText: '删除',
     okButtonProps: { danger: true },
-    onOk: async () => { await dockerRemoveAllContainers(); await refreshModuleStatus(); message.success('已删除相关容器') },
+    onOk: async () => {
+      console.log('[settings] dockerRemoveAllContainers ->')
+      await dockerRemoveAllContainers()
+      try { clearAllPending(); console.log('[settings] clearAllPending() done') } catch {}
+      await refreshModuleStatus()
+      message.success('已删除相关容器')
+    },
   })
 }
 function confirmRemoveAllVolumes() {
@@ -372,7 +386,13 @@ function confirmRemoveAllVolumes() {
     content: '将删除 ai-server-* 相关命名卷，数据将不可恢复。是否继续？',
     okText: '清空数据卷',
     okButtonProps: { danger: true },
-    onOk: async () => { await dockerRemoveAllVolumes(); await refreshModuleStatus(); message.success('已清空数据卷') },
+    onOk: async () => {
+      console.log('[settings] dockerRemoveAllVolumes ->')
+      await dockerRemoveAllVolumes()
+      try { clearAllPending() } catch {}
+      await refreshModuleStatus()
+      message.success('已清空数据卷')
+    },
   })
 }
 function confirmRemoveNetwork() {
@@ -381,7 +401,7 @@ function confirmRemoveNetwork() {
     content: '将删除网络 ai-server-net，是否继续？',
     okText: '删除网络',
     okButtonProps: { danger: true },
-    onOk: async () => { await dockerRemoveCustomNetwork(); message.success('已删除自定义网络') },
+    onOk: async () => { console.log('[settings] dockerRemoveCustomNetwork ->'); await dockerRemoveCustomNetwork(); message.success('已删除自定义网络') },
   })
 }
 function confirmNukeAll() {
@@ -390,7 +410,13 @@ function confirmNukeAll() {
     content: '将停止并删除所有容器、清空数据卷并删除网络。此操作不可恢复，是否继续？',
     okText: '我已知晓风险，继续',
     okButtonProps: { danger: true },
-    onOk: async () => { await dockerNukeAll(); await refreshModuleStatus(); message.success('已完成一键清理') },
+    onOk: async () => {
+      console.log('[settings] dockerNukeAll ->')
+      await dockerNukeAll()
+      try { clearAllPending(); console.log('[settings] clearAllPending() done') } catch {}
+      await refreshModuleStatus()
+      message.success('已完成一键清理')
+    },
   })
 }
 
