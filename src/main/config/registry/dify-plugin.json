@@ -1,0 +1,33 @@
+{
+  "name": "dify-plugin",
+  "type": "feature",
+  "dependsOn": ["dify", "postgres", "redis"],
+  "image": "langgenius/dify-plugin-daemon:0.3.0b1-local",
+  "ports": [
+    { "container": 5002, "host": "${DIFY_PLUGIN_PORT:18092}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+  ],
+  "env": {
+    "SERVER_PORT": "5002",
+    "SERVER_KEY": "${PLUGIN_DAEMON_KEY:change-me-secret}",
+    "DIFY_INNER_API_URL": "http://ai-dify:5001",
+    "DIFY_INNER_API_KEY": "${PLUGIN_DIFY_INNER_API_KEY:change-me-secret}",
+    "PLUGIN_REMOTE_INSTALLING_HOST": "0.0.0.0",
+    "PLUGIN_REMOTE_INSTALLING_PORT": "5003",
+    "REDIS_HOST": "ai-redis",
+    "REDIS_PORT": "6379",
+    "REDIS_PASSWORD": "",
+    "PLUGIN_WORKING_PATH": "/app/storage/cwd",
+    "PLUGIN_STORAGE_TYPE": "local",
+    "PLUGIN_STORAGE_LOCAL_ROOT": "/app/storage",
+    "DB_USERNAME": "${POSTGRES_USER:ai_server}",
+    "DB_PASSWORD": "${POSTGRES_PASSWORD:ai_server_123}",
+    "DB_HOST": "ai-postgres",
+    "DB_PORT": "5432",
+    "DB_DATABASE": "${DB_PLUGIN_DATABASE:dify_plugin}"
+  },
+  "variables": {
+    "DIFY_PLUGIN_PORT": "${DIFY_PLUGIN_PORT:18092}",
+    "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}"
+  },
+  "compose": { "templateRef": "docker-compose.feature.yml" }
+}
