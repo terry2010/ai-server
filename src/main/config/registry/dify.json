@@ -9,6 +9,7 @@
   "env": {
     "DIFY_BIND_ADDRESS": "0.0.0.0",
     "DIFY_PORT": "5001",
+    "MIGRATION_ENABLED": "true",
     "STORAGE_TYPE": "opendal",
     "OPENDAL_SCHEME": "fs",
     "OPENDAL_FS_ROOT": "/app/storage",
