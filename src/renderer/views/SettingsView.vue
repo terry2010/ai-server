@@ -197,8 +197,11 @@
           <a-tab-pane key="debug" tab="调试设置">
             <a-form layout="vertical">
               <a-alert type="warning" show-icon style="margin-bottom: 12px;" message="以下设置实时生效，无需保存" />
-              <a-form-item label="是否显示系统托盘（Tray）">
-                <a-switch v-model:checked="debug.showTray" @change="applyShowTray" />
+              <a-form-item label="显示 原生tray">
+                <a-switch v-model:checked="debug.showTrayNative" @change="applyTrayMode" />
+              </a-form-item>
+              <a-form-item label="显示 自绘tray">
+                <a-switch v-model:checked="debug.showTrayCustom" @change="applyTrayMode" />
               </a-form-item>
               <a-form-item label="窗口控制样式（实时生效）">
                 <a-radio-group v-model:value="ui.windowControlsMode" @change="applyUiMode">
@@ -256,17 +259,17 @@ const dify = ref({ port: 5001, dbUrl: 'postgresql://localhost:5432/dify', env: '
 const oneapi = ref({ port: 3000, apiKey: '', config: '' })
 const ragflow = ref({ port: 8000, vectorUrl: 'qdrant://localhost:6333', env: '' })
 const ui = ref<{ windowControlsMode: 'all'|'mac'|'windows' }>({ windowControlsMode: 'all' })
-const debug = ref<{ showTray: boolean }>({ showTray: false })
+const debug = ref<{ showTrayNative: boolean; showTrayCustom: boolean }>({ showTrayNative: false, showTrayCustom: false })
 
 const saveSettings = async () => { try { await new Promise(r => setTimeout(r, 800)); message.success('设置保存成功（Demo）') } catch { message.error('设置保存失败') } }
 
-// 是否显示 Tray（实时生效，持久化到 global.showTray）
-async function applyShowTray() {
+// Tray 模式（实时生效）
+async function applyTrayMode() {
   try {
-    const payload = { global: { showTray: !!debug.value.showTray } }
+    const payload = { global: { showTrayNative: !!debug.value.showTrayNative, showTrayCustom: !!debug.value.showTrayCustom } }
     const res = await (window as any).api.invoke(IPC.ConfigSet, payload)
     if (!res?.success) throw new Error(res?.message || '保存 Tray 设置失败')
-    message.success(debug.value.showTray ? '已启用系统托盘' : '已关闭系统托盘')
+    message.success('托盘设置已应用')
   } catch (e:any) {
     message.error(e?.message || '应用 Tray 设置失败')
   }
@@ -289,7 +292,8 @@ async function loadNetwork() {
       const mode = g?.ui?.windowControlsMode
       ui.value.windowControlsMode = (mode === 'mac' || mode === 'windows' || mode === 'all') ? mode : 'all'
       // Tray 设置
-      debug.value.showTray = !!g?.showTray
+      debug.value.showTrayNative = !!g?.showTrayNative || !!g?.showTray // 兼容旧字段
+      debug.value.showTrayCustom = !!g?.showTrayCustom
       // 配置注入完毕再拍快照并标记初始化完成
       takeSnapshot()
       inited.value = true

@@ -21,6 +21,8 @@ ipcMain.handle(IPC.ModuleStart, async (_e, payload: { name: ModuleName }) => {
     for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
     // 同步给 Tray 缓存
     try { require('../tray').updateModuleStatusCache?.(payload.name, (status as any)?.data?.status) } catch {}
+    // 刷新自绘托盘（若已打开）
+    try { require('../tray-custom').refreshCustomTray?.() } catch {}
   } catch {}
   return res;
 });
@@ -39,6 +41,7 @@ ipcMain.handle(IPC.ModuleFirstStart, async (_e, payload: { name: ModuleName }) =
     const wins = BrowserWindow.getAllWindows()
     for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
     try { require('../tray').updateModuleStatusCache?.(payload.name, (status as any)?.data?.status) } catch {}
+    try { require('../tray-custom').refreshCustomTray?.() } catch {}
   } catch {}
   return res;
 });
@@ -56,6 +59,7 @@ ipcMain.handle(IPC.ModuleStop, async (_e, payload: { name: ModuleName }) => {
     const status = await getModuleStatus(payload.name)
     const wins = BrowserWindow.getAllWindows()
     for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+    try { require('../tray-custom').refreshCustomTray?.() } catch {}
   } catch {}
   return res;
 });

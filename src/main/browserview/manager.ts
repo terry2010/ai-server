@@ -10,6 +10,7 @@ class BrowserViewManager {
   private views: Map<ModuleKey, BrowserView> = new Map()
   // 默认不预留左侧边距，由渲染端上报实际 top（包含顶部 tabs 与工具栏高度）
   private insets: Insets = { top: 60, left: 0, right: 0, bottom: 0 }
+  private lastOk: Map<ModuleKey, boolean> = new Map()
 
   setInsets(insets: Partial<Insets>) {
     this.insets = { ...this.insets, ...insets }
@@ -26,23 +27,6 @@ class BrowserViewManager {
     if (v && !v.webContents.isDestroyed()) return v
     v = new BrowserView({ webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true } })
     this.views.set(name, v)
-
-    // 解析模块 URL
-    try {
-      let url = ''
-      // 优先：如果是 dify，尽量显示 dify-web 的端口（web 页面）
-      if (name === 'dify') {
-        try {
-          const stWeb = await getModuleStatus('dify-web' as any)
-          url = this.extractFirstHttpUrl((stWeb as any)?.data?.ports || {})
-        } catch {}
-      }
-      if (!url) {
-        const st = await getModuleStatus(name as any)
-        url = this.extractFirstHttpUrl(st.data?.ports || {})
-      }
-      if (url) await v.webContents.loadURL(url)
-    } catch {}
     return v
   }
 
@@ -77,6 +61,8 @@ class BrowserViewManager {
     const win = this.getActiveWindow()
     if (!win) return { success: false, message: 'no window' }
     const v = await this.ensureView(name)
+    // 确保就绪（如需则带重试加载）
+    try { await this.ensureReady(name) } catch {}
     win.setBrowserView(v)
     this.setViewBounds(win, v)
     return { success: true }
@@ -125,8 +111,30 @@ class BrowserViewManager {
 
   async loadUrl(name: ModuleKey, url: string) {
     const v = await this.ensureView(name)
-    try { if (url) await v.webContents.loadURL(url) } catch {}
-    return { success: true }
+    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
+    const maxRetry = 10
+    let attempt = 0
+    let lastErr: any = null
+    if (!url) return { success: false, message: 'empty url' }
+    while (attempt < maxRetry) {
+      try {
+        // 先探测 HTTP 可用性（含重定向处理）
+        const status = await this.probeUrlStatus(url)
+        if (status === 200) {
+          await v.webContents.loadURL(url)
+          this.lastOk.set(name, true)
+          return { success: true }
+        }
+        // 3xx：等待 3 秒再试；其它非 200：等待 2 秒
+        await sleep(status && status >= 300 && status < 400 ? 3000 : 2000)
+      } catch (e) {
+        lastErr = e
+        await sleep(2000)
+      }
+      attempt++
+    }
+    this.lastOk.set(name, false)
+    return { success: false, message: String(lastErr || 'load failed') }
   }
 
   async loadHome(name: ModuleKey) {
@@ -145,6 +153,32 @@ class BrowserViewManager {
       return this.loadUrl(name, url)
     } catch {
       return { success: false }
+    }
+  }
+
+  async ensureReady(name: ModuleKey) {
+    const v = this.views.get(name)
+    if (!v || v.webContents.isDestroyed()) {
+      return this.loadHome(name)
+    }
+    const current = v.webContents.getURL() || ''
+    if (!current) return this.loadHome(name)
+    try {
+      const status = await this.probeUrlStatus(current)
+      if (status !== 200) return this.loadHome(name)
+      this.lastOk.set(name, true)
+      return { success: true }
+    } catch {
+      return this.loadHome(name)
+    }
+  }
+
+  private async probeUrlStatus(url: string): Promise<number | null> {
+    try {
+      const res = await fetch(url, { redirect: 'follow' as any })
+      return res.status || null
+    } catch {
+      return null
     }
   }
 }

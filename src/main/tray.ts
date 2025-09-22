@@ -1,16 +1,29 @@
 import { app, Menu, Tray, nativeImage, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { getGlobalConfig } from './config/store'
-import { listModules } from './docker/modules'
+import { listModules, startModule, stopModule } from './docker/modules'
 import { getModuleStatus } from './docker/status'
 
 let tray: Tray | null = null
 let lastMenuJSON = ''
 const statusCache: Record<string, 'running'|'stopped'|'error'|'parse_error'|undefined> = {}
 
+// 加载状态点图标（从文件加载，支持高DPI）
+function loadStatusIcon(color: 'green'|'gray'|'red'): Electron.NativeImage {
+  try {
+    const iconPath = path.resolve(process.cwd(), 'build', `dot-${color}.ico`)
+    const img = nativeImage.createFromPath(iconPath)
+    if (!img.isEmpty()) {
+      return img.resize({ width: 8, height: 8 })
+    }
+  } catch {}
+  return nativeImage.createEmpty()
+}
+
 function getIcon() {
   try {
-    const iconPath = path.resolve(process.cwd(), 'src/mainui/assets/favicon.png')
+    // 使用打包资源 build/icon.ico，避免引用 doc 目录
+    const iconPath = path.resolve(process.cwd(), 'build', 'icon.ico')
     let img = nativeImage.createFromPath(iconPath)
     if (!img.isEmpty()) {
       // 缩放到 16x16，避免托盘菜单过大
@@ -44,21 +57,60 @@ async function buildContextTemplate() {
   const icon = getIcon()
   items.push({ label: 'AI-Server 管理平台', icon: icon.isEmpty() ? undefined : icon, enabled: false })
   items.push({ type: 'separator' })
-  // 模块状态
+  // 各模块二级菜单
   for (const m of mods) {
+    let s: 'running'|'stopped'|'error'|'parse_error' = 'stopped'
     try {
-      // 优先使用缓存的事件驱动状态，若无再读一次
-      let s = statusCache[m.name]
-      if (!s) {
+      let cache = statusCache[m.name]
+      if (!cache) {
         const resp: any = await getModuleStatus(m.name as any)
-        s = (resp?.data?.status || 'stopped')
+        cache = (resp?.data?.status || 'stopped')
       }
-      const dot = s === 'running' ? '🟢' : s === 'error' ? '🔴' : '⚪'
-      const name = (m.name === 'dify' ? 'Dify' : m.name === 'oneapi' ? 'OneAPI' : m.name === 'ragflow' ? 'RagFlow' : 'n8n')
-      items.push({ label: `${name} ${dot} ${s || 'stopped'}`, enabled: false })
-    } catch {
-      items.push({ label: `${m.name} ⚪ stopped`, enabled: false })
+      s = (cache as any)
+    } catch {}
+    const pretty = (m.name === 'dify' ? 'Dify' : m.name === 'oneapi' ? 'OneAPI' : m.name === 'ragflow' ? 'RagFlow' : 'n8n')
+    const ico = s === 'running' ? loadStatusIcon('green') : s === 'error' ? loadStatusIcon('red') : loadStatusIcon('gray')
+    const running = s === 'running'
+    const submenu: any[] = []
+    submenu.push({ label: `${pretty} - 简介：${pretty} 服务`, enabled: false })
+    submenu.push({ type: 'separator' })
+    if (running) {
+      submenu.push({ label: '停止', click: async () => { try { await stopModule(m.name as any); statusCache[m.name] = 'stopped'; ensureTray().catch(()=>{}) } catch {} } })
+    } else {
+      submenu.push({ label: '启动', click: async () => { 
+        try { 
+          await startModule(m.name as any); 
+          statusCache[m.name] = 'running'; 
+          ensureTray().catch(()=>{})
+          
+          // 启动后自动在后台加载对应页面（如果从未打开过）
+          try {
+            const wins = BrowserWindow.getAllWindows()
+            const route = '/' + m.name.toLowerCase()
+            const { IPC } = require('../shared/ipc-contract')
+            for (const w of wins) {
+              // 通知渲染进程预加载页面但不切换焦点
+              w.webContents.send(IPC.PreloadModulePage, { module: m.name })
+            }
+          } catch {}
+        } catch {} 
+      } })
     }
+    // 仅当模块运行时才显示“打开模块”
+    if (running) {
+      submenu.push({ 
+        label: '打开模块', 
+        click: () => {
+          try {
+            showMainWindow()
+            const wins = BrowserWindow.getAllWindows()
+            const route = '/' + m.name.toLowerCase()
+            for (const w of wins) w.webContents.send(require('../shared/ipc-contract').IPC.UIGoto, { path: route })
+          } catch {}
+        }
+      })
+    }
+    items.push({ label: `${pretty}`, icon: ico, submenu })
   }
   items.push({ type: 'separator' })
   items.push({ label: '打开主界面', click: () => showMainWindow() })
@@ -77,7 +129,7 @@ async function buildContextTemplate() {
 
 export async function ensureTray() {
   const cfg = getGlobalConfig() as any
-  const want = !!cfg.showTray
+  const want = !!cfg.showTrayNative || !!cfg.showTray || !!cfg.showTrayCustom
   if (!want) {
     if (tray) { tray.destroy(); tray = null }
     return
@@ -85,6 +137,17 @@ export async function ensureTray() {
   if (!tray) {
     tray = new Tray(getIcon())
     tray.setToolTip('AI-Server 管理平台')
+    // 点击托盘：统一打开主界面
+    try {
+      const { toggleCustomTray } = require('./tray-custom')
+      tray.on('click', () => { showMainWindow() })
+      // 双击托盘：同时打开主界面 + 自绘托盘弹窗
+      tray.on('double-click', () => {
+        showMainWindow()
+        const enableCustom = !!(getGlobalConfig() as any)?.showTrayCustom
+        if (enableCustom) toggleCustomTray()
+      })
+    } catch {}
   }
   const template = await buildContextTemplate()
   const json = JSON.stringify(template)

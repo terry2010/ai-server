@@ -36,5 +36,31 @@ try {
     api.on(IPC.UIGoto, (_e: any, p: any) => {
       try { router.push(String(p?.path || '/settings')) } catch {}
     })
+    // 后台预加载模块页面（创建/加载 BrowserView，但不切换焦点）
+    api.on(IPC.PreloadModulePage, async (_e: any, p: any) => {
+      try {
+        const name = String(p?.module || '').toLowerCase()
+        if (!name) return
+        await (window as any).api.invoke(IPC.BVLoadHome, { name })
+        console.log('[ui] preload module page ok <-', name)
+      } catch (e) {
+        console.warn('[ui] preload module page fail <-', p, e)
+      }
+    })
+
+    // 订阅模块状态事件：当模块变为 running 且尚未预加载过时，后台加载 BrowserView
+    const preloaded = new Set<string>()
+    api.on(IPC.ModuleStatusEvent, async (_e: any, payload: any) => {
+      try {
+        const name = String(payload?.name || '').toLowerCase()
+        const st = payload?.status?.data?.status || payload?.status?.status
+        if (!name || st !== 'running' || preloaded.has(name)) return
+        await (window as any).api.invoke(IPC.BVLoadHome, { name })
+        preloaded.add(name)
+        console.log('[ui] preload by status running <-', name)
+      } catch (err) {
+        console.warn('[ui] preload by status running fail <-', payload, err)
+      }
+    })
   }
 } catch {}

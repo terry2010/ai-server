@@ -81,4 +81,5 @@ export const IPC = {
   WindowStateEvent: 'ai/window/stateEvent',
   WindowOpenDevTools: 'ai/window/openDevTools',
   UIGoto: 'ai/ui/goto',
+  PreloadModulePage: 'ai/ui/preloadModulePage', // 后台预加载模块页面
 } as const;

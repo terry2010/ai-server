@@ -24,6 +24,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     frame: false, // 无边框窗口
+    icon: require('node:path').resolve(process.cwd(), 'build', 'icon.ico'),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     trafficLightPosition: process.platform === 'darwin' ? { x: 12, y: 12 } : undefined,
     webPreferences: {
@@ -100,6 +101,27 @@ app.whenReady().then(() => {
     }
     try { require('./ipc/browserview') } catch (e) { console.warn('[main] load browserview ipc failed', e) }
     try { require('./tray').ensureTray?.() } catch (e) { console.warn('[main] ensureTray failed', e) }
+
+    // 应用启动后：若有模块已在运行，则后台预加载对应 BrowserView（不抢焦点）
+    ;(async () => {
+      try {
+        const { listModules } = require('./docker/modules')
+        const { getModuleStatus } = require('./docker/status')
+        const { BVManager } = require('./browserview/manager')
+        const mods: Array<{ name: string }> = listModules()
+        const webModules = new Set(['n8n','dify','oneapi','ragflow'])
+        for (const m of mods) {
+          if (!webModules.has(String(m.name).toLowerCase())) continue
+          try {
+            const st = await getModuleStatus(m.name)
+            const status = (st?.data?.status || st?.status)
+            if (status === 'running') {
+              await BVManager.loadHome(m.name)
+            }
+          } catch {}
+        }
+      } catch (e) { console.warn('[main] preload running modules failed', e) }
+    })()
   } catch (e) {
     console.error('[main] failed to load ipc handlers:', e);
   }

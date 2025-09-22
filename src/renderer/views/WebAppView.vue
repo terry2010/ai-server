@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getModuleStatus, bvRefresh, bvGoBack, bvGoForward, openExternal, bvSetInsets, bvLoadHome } from '../services/ipc'
+import { getModuleStatus, bvRefresh, bvGoBack, bvGoForward, openExternal, bvSetInsets, bvLoadHome, bvShow } from '../services/ipc'
 
 const route = useRoute()
 const router = useRouter()
@@ -103,10 +103,16 @@ async function applyInsets() {
 
 onMounted(async () => {
   await resolveUrl()
+  // 将（可能已预加载的）BrowserView 挂载到窗口，不会触发重新加载
+  try { const name = String(route.name || '').toLowerCase() as any; await bvShow(name) } catch {}
   await applyInsets()
   window.addEventListener('resize', applyInsets)
 })
-watch(() => route.name, async () => { await resolveUrl(); await applyInsets() })
+watch(() => route.name, async () => {
+  await resolveUrl()
+  try { const name = String(route.name || '').toLowerCase() as any; await bvShow(name) } catch {}
+  await applyInsets()
+})
 onBeforeUnmount(() => window.removeEventListener('resize', applyInsets))
 </script>
 
