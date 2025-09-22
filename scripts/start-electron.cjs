@@ -25,7 +25,7 @@ const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5174';
       NODE_ENV: 'development',
     };
 
-    const child = spawn('electron', ['.'], {
+    const child = spawn('electron', ['.', '--trace-warnings'], {
       stdio: 'inherit',
       shell: true, // important for Git Bash / PowerShell command resolution
       env,

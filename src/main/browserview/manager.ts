@@ -1,6 +1,7 @@
 import { BrowserView, BrowserWindow } from 'electron'
 import { loadRegistry } from '../config/store'
 import { getModuleStatus } from '../docker/status'
+import { emitOpsLog } from '../logs/app-ops-log'
 
 export type ModuleKey = 'n8n' | 'dify' | 'oneapi' | 'ragflow'
 
@@ -123,6 +124,7 @@ class BrowserViewManager {
         if (status === 200) {
           await v.webContents.loadURL(url)
           this.lastOk.set(name, true)
+          try { emitOpsLog(`[bv] loadUrl success: ${name} -> ${url}`) } catch {}
           return { success: true }
         }
         // 3xx：等待 3 秒再试；其它非 200：等待 2 秒
@@ -134,6 +136,7 @@ class BrowserViewManager {
       attempt++
     }
     this.lastOk.set(name, false)
+    try { emitOpsLog(`[bv] loadUrl fail: ${name} -> ${url} after ${maxRetry} retries: ${String(lastErr || 'load failed')}`, 'warn') } catch {}
     return { success: false, message: String(lastErr || 'load failed') }
   }
 
@@ -150,7 +153,9 @@ class BrowserViewManager {
         const st = await getModuleStatus(name as any)
         url = this.extractFirstHttpUrl((st as any)?.data?.ports || (st as any)?.ports || {})
       }
-      return this.loadUrl(name, url)
+      const res = await this.loadUrl(name, url)
+      try { emitOpsLog(`[bv] loadHome ${name} -> ${url} => ${res.success?'OK':'FAIL'}`) } catch {}
+      return res
     } catch {
       return { success: false }
     }
