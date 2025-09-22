@@ -50,9 +50,18 @@
               <a-divider>镜像加速</a-divider>
               <a-row :gutter="24">
                 <a-col :span="24">
-                  <a-form-item label="镜像加速地址（支持多个）">
-                    <div class="mirror-list">
-                      <div class="mirror-row" v-for="(m, idx) in net.mirrors" :key="idx">
+                  <a-form-item label="镜像加速地址（支持拖拽排序）">
+                    <div class="mirror-list"
+                         @dragover.prevent
+                         @dragenter.prevent>
+                      <div class="mirror-row"
+                           v-for="(m, idx) in net.mirrors"
+                           :key="idx"
+                           draggable="true"
+                           @dragstart="onMirrorDragStart(idx)"
+                           @dragover.prevent="onMirrorDragOver(idx)"
+                           @drop.prevent="onMirrorDrop(idx)">
+                        <span class="drag-handle" title="拖动排序">⋮⋮</span>
                         <a-input v-model:value="net.mirrors[idx]" placeholder="例如 https://docker.m.daocloud.io" style="flex: 1;" />
                         <a-button type="text" danger @click="removeMirror(idx)" v-if="net.mirrors.length > 1">删除</a-button>
                       </div>
@@ -188,6 +197,9 @@
           <a-tab-pane key="debug" tab="调试设置">
             <a-form layout="vertical">
               <a-alert type="warning" show-icon style="margin-bottom: 12px;" message="以下设置实时生效，无需保存" />
+              <a-form-item label="是否显示系统托盘（Tray）">
+                <a-switch v-model:checked="debug.showTray" @change="applyShowTray" />
+              </a-form-item>
               <a-form-item label="窗口控制样式（实时生效）">
                 <a-radio-group v-model:value="ui.windowControlsMode" @change="applyUiMode">
                   <a-radio value="all">全部显示</a-radio>
@@ -244,8 +256,21 @@ const dify = ref({ port: 5001, dbUrl: 'postgresql://localhost:5432/dify', env: '
 const oneapi = ref({ port: 3000, apiKey: '', config: '' })
 const ragflow = ref({ port: 8000, vectorUrl: 'qdrant://localhost:6333', env: '' })
 const ui = ref<{ windowControlsMode: 'all'|'mac'|'windows' }>({ windowControlsMode: 'all' })
+const debug = ref<{ showTray: boolean }>({ showTray: false })
 
 const saveSettings = async () => { try { await new Promise(r => setTimeout(r, 800)); message.success('设置保存成功（Demo）') } catch { message.error('设置保存失败') } }
+
+// 是否显示 Tray（实时生效，持久化到 global.showTray）
+async function applyShowTray() {
+  try {
+    const payload = { global: { showTray: !!debug.value.showTray } }
+    const res = await (window as any).api.invoke(IPC.ConfigSet, payload)
+    if (!res?.success) throw new Error(res?.message || '保存 Tray 设置失败')
+    message.success(debug.value.showTray ? '已启用系统托盘' : '已关闭系统托盘')
+  } catch (e:any) {
+    message.error(e?.message || '应用 Tray 设置失败')
+  }
+}
 const resetSettings = () => { systemSettings.value = { name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true }; message.info('设置已重置') }
 const testConnection = async () => { try { await new Promise(r => setTimeout(r, 800)); message.success('连接测试成功（Demo）') } catch { message.error('连接测试失败') } }
 
@@ -263,6 +288,8 @@ async function loadNetwork() {
       // UI 设置
       const mode = g?.ui?.windowControlsMode
       ui.value.windowControlsMode = (mode === 'mac' || mode === 'windows' || mode === 'all') ? mode : 'all'
+      // Tray 设置
+      debug.value.showTray = !!g?.showTray
       // 配置注入完毕再拍快照并标记初始化完成
       takeSnapshot()
       inited.value = true
@@ -294,6 +321,20 @@ onMounted(() => { loadNetwork() })
 
 function addMirror() { net.value.mirrors.push('') }
 function removeMirror(i: number) { if (net.value.mirrors.length > 1) net.value.mirrors.splice(i, 1) }
+
+// 拖拽排序逻辑
+const mirrorDrag = ref<{ from: number | null }>({ from: null })
+function onMirrorDragStart(i: number) { mirrorDrag.value.from = i }
+function onMirrorDragOver(_i: number) { /* 可加高亮占位 */ }
+function onMirrorDrop(to: number) {
+  const from = mirrorDrag.value.from
+  mirrorDrag.value.from = null
+  if (from === null || from === to) return
+  const arr = [...net.value.mirrors]
+  const [m] = arr.splice(from, 1)
+  arr.splice(to, 0, m)
+  net.value.mirrors = arr
+}
 
 // ---------- 脏标记与离开确认 ----------
 const initialSnapshot = ref<string>('')
@@ -487,7 +528,9 @@ onMounted(() => {
 .settings-card :deep(.ant-tabs-nav-list) { overflow: visible !important; }
 .settings-actions { display: flex; gap: var(--spacing-md); justify-content: center; margin-top: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 1px solid var(--border-light); }
 .mirror-list { display: flex; flex-direction: column; gap: 8px; }
-.mirror-row { display: flex; gap: 8px; align-items: center; }
+.mirror-row { display: flex; gap: 8px; align-items: center; padding: 6px; border: 1px dashed transparent; border-radius: 6px; }
+.mirror-row.drag-over { background: var(--bg-tertiary); border-color: var(--border-light); }
+.drag-handle { cursor: grab; user-select: none; color: var(--text-tertiary); padding: 0 6px; font-weight: 700; }
 .settings-actions .ant-btn { min-width: 120px; border-radius: var(--radius-md); font-weight: 500; transition: all var(--transition-base); }
 .settings-actions .ant-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .settings-actions .ant-btn-primary { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); border: none; box-shadow: 0 0 20px rgba(0, 122, 255, 0.3); }

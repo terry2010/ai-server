@@ -32,5 +32,9 @@ try {
         else console.log(text)
       } catch (e) { console.log('[ModuleLog]', p) }
     })
+    // 主进程触发的 UI 跳转（用于 Tray 菜单“系统设置”等）
+    api.on(IPC.UIGoto, (_e: any, p: any) => {
+      try { router.push(String(p?.path || '/settings')) } catch {}
+    })
   }
 } catch {}

@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc-contract';
 import { getGlobalConfig, setGlobalConfig, getFirstRunState, patchFirstRunState } from '../config/store';
+import { ensureTray } from '../tray';
 
 ipcMain.handle(IPC.ConfigGet, async (_e, key?: string) => {
   if (!key) {
@@ -14,5 +15,6 @@ ipcMain.handle(IPC.ConfigGet, async (_e, key?: string) => {
 ipcMain.handle(IPC.ConfigSet, async (_e, payload: { global?: Record<string, any>; firstRun?: Record<string, any> }) => {
   if (payload?.global) setGlobalConfig(payload.global as any);
   if (payload?.firstRun) patchFirstRunState(payload.firstRun as any);
+  try { ensureTray(); } catch {}
   return { success: true, data: { global: getGlobalConfig(), firstRun: getFirstRunState() } };
 });

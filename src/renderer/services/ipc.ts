@@ -4,6 +4,11 @@ import { IPC, type ModuleName, type ModuleStatus } from '../../shared/ipc-contra
 // 为避免 TS 报错，这里不声明 window.api 类型，直接使用 any
 const invoke = (channel: string, payload?: any) => (window as any).api.invoke(channel, payload)
 
+// 追加一条客户端日志（用于记录用户操作等）
+export async function appendClientLog(message: string, level: 'error'|'warn'|'info'|'debug' = 'info'): Promise<void> {
+  try { await invoke(IPC.AppClientLogAppend, { message, level }) } catch {}
+}
+
 export async function listModules(): Promise<{ name: string; type: string }[]> {
   const res = await invoke(IPC.ModulesList)
   if (!res?.success) throw new Error(res?.message || 'ModulesList 调用失败')
@@ -33,22 +38,26 @@ export async function getModuleStatus(name: ModuleName): Promise<ModuleStatus> {
 
 export async function startModule(name: ModuleName) {
   console.log('[ipc] startModule ->', name)
+  try { appendClientLog(`[ui] 点击启动 ${name}`, 'info') } catch {}
   const t0 = performance.now()
   const res = await invoke(IPC.ModuleStart, { name })
   const t1 = performance.now()
   if (res?.success) console.log('[ipc] startModule ok <-', name, `(${Math.round(t1 - t0)}ms)`) 
   else console.error('[ipc] startModule fail <-', name, res)
+  try { appendClientLog(`[ui] 启动 ${name} => ${res?.success ? 'OK' : 'FAIL'} ${res?.message||''}`, res?.success ? 'info' : 'error') } catch {}
   if (!res?.success) throw new Error(res?.message || `启动失败: ${name}`)
   return res
 }
 
 export async function stopModule(name: ModuleName) {
   console.log('[ipc] stopModule ->', name)
+  try { appendClientLog(`[ui] 点击停止 ${name}`, 'info') } catch {}
   const t0 = performance.now()
   const res = await invoke(IPC.ModuleStop, { name })
   const t1 = performance.now()
   if (res?.success) console.log('[ipc] stopModule ok <-', name, `(${Math.round(t1 - t0)}ms)`) 
   else console.error('[ipc] stopModule fail <-', name, res)
+  try { appendClientLog(`[ui] 停止 ${name} => ${res?.success ? 'OK' : 'FAIL'} ${res?.message||''}`, res?.success ? 'info' : 'error') } catch {}
   if (!res?.success) throw new Error(res?.message || `停止失败: ${name}`)
   return res
 }

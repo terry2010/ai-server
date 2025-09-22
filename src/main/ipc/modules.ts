@@ -6,6 +6,7 @@ import { emitOpsLog } from '../logs/app-ops-log'
 import { attachModuleContainers, detachModuleContainers } from '../docker/logs-attach';
 import { getModuleLogs } from '../docker/logs';
 import { getOpsLogs } from '../logs/app-ops-log'
+import { emitOpsLog as appendOpsLog } from '../logs/app-ops-log'
 
 ipcMain.handle(IPC.ModulesList, async () => ({ success: true, data: { items: listModules() } }));
 
@@ -18,6 +19,8 @@ ipcMain.handle(IPC.ModuleStart, async (_e, payload: { name: ModuleName }) => {
     const status = await getModuleStatus(payload.name)
     const wins = BrowserWindow.getAllWindows()
     for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+    // 同步给 Tray 缓存
+    try { require('../tray').updateModuleStatusCache?.(payload.name, (status as any)?.data?.status) } catch {}
   } catch {}
   return res;
 });
@@ -35,6 +38,7 @@ ipcMain.handle(IPC.ModuleFirstStart, async (_e, payload: { name: ModuleName }) =
     const status = await getModuleStatus(payload.name)
     const wins = BrowserWindow.getAllWindows()
     for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+    try { require('../tray').updateModuleStatusCache?.(payload.name, (status as any)?.data?.status) } catch {}
   } catch {}
   return res;
 });
@@ -59,6 +63,18 @@ ipcMain.handle(IPC.ModuleStop, async (_e, payload: { name: ModuleName }) => {
 ipcMain.handle(IPC.ModuleStopStream, async (e, payload: { name: ModuleName; streamId: string }) => {
   return stopModuleStream(payload.name, e.sender, payload.streamId);
 });
+
+// 渲染端追加一条客户端日志（用于记录点击按钮等用户操作）
+ipcMain.handle(IPC.AppClientLogAppend, async (_e, payload: { level?: 'error'|'warn'|'info'|'debug'; message: string }) => {
+  try {
+    const level = (payload?.level || 'info') as any
+    const msg = String(payload?.message || '')
+    appendOpsLog(msg, level)
+    return { success: true }
+  } catch (e: any) {
+    return { success: false, code: 'E_RUNTIME', message: e?.message || String(e) }
+  }
+})
 
 // 客户端日志历史
 ipcMain.handle(IPC.AppClientLogsGet, async (_e, payload?: { tail?: number }) => {

@@ -69,6 +69,7 @@ export const IPC = {
   ModuleLogsAttach: 'ai/module/logsAttach',
   ModuleLogsDetach: 'ai/module/logsDetach',
   AppClientLogsGet: 'ai/logs/client/get',
+  AppClientLogAppend: 'ai/logs/client/append',
   ConfigGet: 'ai/config/get',
   ConfigSet: 'ai/config/set',
   ModuleLogEvent: 'ai/module/log',
@@ -79,4 +80,5 @@ export const IPC = {
   WindowGetState: 'ai/window/getState',
   WindowStateEvent: 'ai/window/stateEvent',
   WindowOpenDevTools: 'ai/window/openDevTools',
+  UIGoto: 'ai/ui/goto',
 } as const;

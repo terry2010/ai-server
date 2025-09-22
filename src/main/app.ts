@@ -99,6 +99,7 @@ app.whenReady().then(() => {
       console.warn('[main] start docker events watcher failed', e);
     }
     try { require('./ipc/browserview') } catch (e) { console.warn('[main] load browserview ipc failed', e) }
+    try { require('./tray').ensureTray?.() } catch (e) { console.warn('[main] ensureTray failed', e) }
   } catch (e) {
     console.error('[main] failed to load ipc handlers:', e);
   }
