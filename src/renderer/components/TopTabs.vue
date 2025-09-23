@@ -124,7 +124,9 @@ const router = useRouter()
 const route = useRoute()
 const activeTab = ref('home')
 const defaultModules = ['n8n','dify','oneapi','ragflow'] as const
-const moduleTabs = ref<string[]>([...defaultModules])
+// 维护一个“顺序”列表（包含所有模块）；实际渲染根据状态过滤
+const orderTabs = ref<string[]>([...defaultModules])
+const moduleTabs = ref<string[]>([])
 const showMenu = ref(false)
 const menuBtn = ref<HTMLElement | null>(null)
 const isMaximized = ref(false)
@@ -194,8 +196,9 @@ onMounted(() => {
         const valid = order.filter((k: any) => defaultModules.includes(k))
         // 追加漏掉的模块
         const merged = Array.from(new Set([...(valid as string[]), ...defaultModules]))
-        moduleTabs.value = merged
+        orderTabs.value = merged
       }
+      recomputeVisibleTabs()
     } catch {}
   }).catch(() => {})
   // 监听设置页实时事件
@@ -211,6 +214,7 @@ onMounted(() => {
       if (!name || !resp?.success) return
       const st = resp.data as any
       ;(moduleStore.dots as any)[name] = (st.status === 'parse_error' ? 'error' : st.status)
+      recomputeVisibleTabs()
     }
     ;(window as any).api.on(IPC.ModuleStatusEvent, onStatus)
     onBeforeUnmount(() => {
@@ -232,6 +236,7 @@ onMounted(async () => {
       ;(moduleStore.dots as any)[n] = st === 'parse_error' ? 'error' : (st || 'stopped')
     } catch {}
   }
+  recomputeVisibleTabs()
   // 初始化 Sortable 拖拽
   setTimeout(initSortable, 0)
   // 监听重置顺序事件
@@ -282,12 +287,13 @@ function onDrop(targetKey: string, _ev: DragEvent) {
   const to = arr.indexOf(targetKey)
   if (from === -1 || to === -1) { dragKey = null; return }
   arr.splice(to, 0, ...arr.splice(from, 1))
-  moduleTabs.value = arr
+  orderTabs.value = arr
+  recomputeVisibleTabs()
   dragKey = null
   dragOverKey.value = null
   // 持久化
   try {
-    (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: moduleTabs.value } } })
+    (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } })
   } catch {}
 }
 
@@ -326,9 +332,10 @@ function initSortable() {
           const mod = span?.dataset?.mod
           if (mod) keys.push(mod)
         })
-        if (keys.length === moduleTabs.value.length) {
-          moduleTabs.value = keys
-          try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: moduleTabs.value } } }) } catch {}
+        if (keys.length > 0) {
+          orderTabs.value = keys
+          recomputeVisibleTabs()
+          try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } }) } catch {}
         }
       }
     })
@@ -336,8 +343,23 @@ function initSortable() {
 }
 
 function resetTabOrder() {
-  moduleTabs.value = [...defaultModules]
-  try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: moduleTabs.value } } }) } catch {}
+  orderTabs.value = [...defaultModules]
+  recomputeVisibleTabs()
+  try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } }) } catch {}
+}
+
+// 仅展示运行/异常的模块 Tab
+function recomputeVisibleTabs() {
+  const visible = orderTabs.value.filter(k => {
+    const st = (moduleStore.dots as any)[k]
+    return st === 'running' || st === 'error' || st === 'parse_error'
+  })
+  moduleTabs.value = visible
+  // 若当前激活的模块已不可见，切回首页
+  if (activeTab.value !== 'home' && !moduleTabs.value.includes(activeTab.value)) {
+    activeTab.value = 'home'
+    router.push({ name: 'home' })
+  }
 }
 </script>
 

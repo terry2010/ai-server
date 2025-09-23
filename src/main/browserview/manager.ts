@@ -1,4 +1,4 @@
-import { BrowserView, BrowserWindow } from 'electron'
+import { BrowserView, BrowserWindow, shell } from 'electron'
 import { loadRegistry } from '../config/store'
 import { getModuleStatus } from '../docker/status'
 import { emitOpsLog } from '../logs/app-ops-log'
@@ -13,10 +13,18 @@ class BrowserViewManager {
   // 默认不预留左侧边距，由渲染端上报实际 top（包含顶部 tabs 与工具栏高度）
   private insets: Insets = { top: 60, left: 0, right: 0, bottom: 0 }
   private lastOk: Map<ModuleKey, boolean> = new Map()
+  private newWindowMode: 'in_app' | 'system' = 'in_app'
 
   setInsets(insets: Partial<Insets>) {
     this.insets = { ...this.insets, ...insets }
     this.updateBoundsForActive()
+  }
+
+  applyUi(payload?: Partial<{ newWindowMode: 'in_app'|'system' }>) {
+    if (!payload) return
+    if (payload.newWindowMode === 'in_app' || payload.newWindowMode === 'system') {
+      this.newWindowMode = payload.newWindowMode
+    }
   }
 
   async clearData(name: ModuleKey) {
@@ -73,6 +81,18 @@ class BrowserViewManager {
     if (v && !v.webContents.isDestroyed()) return v
     v = new BrowserView({ webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true } })
     this.views.set(name, v)
+    try {
+      v.webContents.setWindowOpenHandler(({ url }) => {
+        const mode = this.newWindowMode
+        if (mode === 'in_app') {
+          setTimeout(() => { try { v!.webContents.loadURL(url) } catch {} }, 0)
+          return { action: 'deny' }
+        } else {
+          try { shell.openExternal(url) } catch {}
+          return { action: 'deny' }
+        }
+      })
+    } catch {}
     return v
   }
 

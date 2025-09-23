@@ -285,8 +285,13 @@ export async function createOrStartContainerForModule(mod: ModuleSchema): Promis
           if (a !== b) { sameBindingValues = false; break }
         }
       }
-      if (!sameImage || !sameBindingKeys || !sameBindingValues) {
-        const reason = !sameImage ? `image mismatch -> ${oldImage} -> ${image}` : (!sameBindingKeys ? 'port keys changed' : 'port bindings changed')
+      // 比较命令（需要先生成期望命令）
+      const desiredCmdRaw = resolveCommand(mod)
+      const desiredCmd = Array.isArray(desiredCmdRaw) ? desiredCmdRaw.map(s => resolveExpr(String(s)) || '').filter(Boolean) : undefined
+      const oldCmd = (oldInfo?.Config?.Cmd || []) as string[]
+      const sameCmd = JSON.stringify(desiredCmd || []) === JSON.stringify(oldCmd || [])
+      if (!sameImage || !sameBindingKeys || !sameBindingValues || !sameCmd) {
+        const reason = !sameImage ? `image mismatch -> ${oldImage} -> ${image}` : (!sameBindingKeys ? 'port keys changed' : (!sameBindingValues ? 'port bindings changed' : 'cmd changed'))
         emitOpsLog(`[docker] recreate ${cname}: ${reason}`)
         try { if (oldInfo?.State?.Running) await docker.getContainer(cname).stop() } catch {}
         try { await docker.getContainer(cname).remove({ force: true }) } catch {}
@@ -296,11 +301,17 @@ export async function createOrStartContainerForModule(mod: ModuleSchema): Promis
   }
 
   if (needCreate) {
+    // 解析命令中的占位符（例如 ${REDIS_PASSWORD:xxx}）
+    const cmdRaw = resolveCommand(mod)
+    let cmdResolved: string[] | undefined = undefined
+    if (Array.isArray(cmdRaw)) {
+      cmdResolved = cmdRaw.map(s => resolveExpr(String(s)) || '').filter(s => s.length > 0)
+    }
     const createOpts: any = {
       name: cname,
       Image: image,
       Env: toEnvArray(envRec),
-      Cmd: resolveCommand(mod),
+      Cmd: cmdResolved,
       ExposedPorts: resolvedPorts.length > 0 ? resolvedPorts.reduce((acc: any, p: any) => { if (p.container) acc[`${p.container}/tcp`] = {}; return acc }, {} as any) : undefined,
       Labels: { 'ai.module': mod.name, 'ai.type': String((mod as any).type || '') },
       HostConfig: {

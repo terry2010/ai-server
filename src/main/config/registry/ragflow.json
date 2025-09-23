@@ -13,7 +13,9 @@
     "ELASTIC_PASSWORD": "${ELASTIC_PASSWORD:infini_rag_flow}",
     "MINIO_HOST": "${MINIO_HOST:ai-minio}",
     "MYSQL_HOST": "${MYSQL_HOST:ai-mysql}",
-    "REDIS_HOST": "${REDIS_HOST:ai-redis}"
+    "REDIS_HOST": "${REDIS_HOST:ai-redis}",
+    "REDIS_DB": "${REDIS_DB:1}",
+    "REDIS_PASSWORD": "${REDIS_PASSWORD:infini_rag_flow}"
   },
   "volumes": [
     { "host": "c:\\code\\ai-server\\orchestration\\modules\\ragflow\\nginx\\ragflow.conf", "container": "/etc/nginx/conf.d/ragflow.conf" },

@@ -59,6 +59,8 @@ ipcMain.handle(IPC.ModuleStop, async (_e, payload: { name: ModuleName }) => {
     const status = await getModuleStatus(payload.name)
     const wins = BrowserWindow.getAllWindows()
     for (const w of wins) w.webContents.send(IPC.ModuleStatusEvent, { name: payload.name, status })
+    // 同步给 Tray 缓存
+    try { require('../tray').updateModuleStatusCache?.(payload.name, (status as any)?.data?.status) } catch {}
     try { require('../tray-custom').refreshCustomTray?.() } catch {}
   } catch {}
   return res;

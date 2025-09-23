@@ -23,6 +23,39 @@ const VOLUME_NAMES = [
   'ai-server-postgres-data',
   'ai-server-logs',
 ];
+// 额外的卷名前缀（尽量覆盖我们创建的卷，避免误删用户其他卷）
+const VOLUME_PREFIXES = [
+  'ai-server-', 'aiserver-',
+  // 常见服务前缀（仅在 dangling 时删除，降低风险）
+  'n8n-', 'dify-', 'oneapi-', 'ragflow-', 'qdrant-', 'es-', 'elasticsearch-', 'mysql-', 'redis-', 'minio-', 'postgres-'
+];
+
+async function removeRelatedVolumes(docker: any) {
+  // 删除已知命名卷
+  try {
+    const vinfo = await docker.listVolumes();
+    const vols: any[] = (vinfo?.Volumes || []);
+    for (const v of vols) {
+      const name = String(v?.Name || '');
+      if (VOLUME_NAMES.includes(name)) {
+        try { await docker.getVolume(name).remove({ force: true }); } catch {}
+      }
+    }
+  } catch {}
+
+  // 删除 dangling 卷（未被任何容器引用的卷）
+  try {
+    const vinfoDangling = await docker.listVolumes({ filters: { dangling: { true: true } } });
+    const volsDangling: any[] = (vinfoDangling?.Volumes || []);
+    for (const v of volsDangling) {
+      const name = String(v?.Name || '');
+      // 优先删除我们前缀的卷；其它 dangling 也可删除（一般为匿名卷）
+      if (VOLUME_PREFIXES.some(p => name.startsWith(p)) || true) {
+        try { await docker.getVolume(name).remove({ force: true }); } catch {}
+      }
+    }
+  } catch {}
+}
 const NETWORK_NAME = 'ai-server-net';
 const CONTAINER_KEYWORDS = ['ai-server', 'n8n', 'dify', 'oneapi', 'ragflow', 'postgres', 'mysql', 'redis', 'minio', 'qdrant', 'es', 'elasticsearch'];
 
@@ -99,14 +132,7 @@ ipcMain.handle(IPC.DockerRemoveAllVolumes, async (): Promise<IpcResponse> => {
   const docker = getDocker();
   if (!docker) return { success: false, message: 'Docker 不可用' };
   try {
-    const vinfo = await docker.listVolumes();
-    const vols: any[] = (vinfo?.Volumes || []);
-    for (const v of vols) {
-      const name = String(v?.Name || '');
-      if (VOLUME_NAMES.includes(name)) {
-        try { await docker.getVolume(name).remove({ force: true }); } catch {}
-      }
-    }
+    await removeRelatedVolumes(docker);
     return { success: true };
   } catch (e: any) {
     return { success: false, message: e?.message || String(e) };
@@ -147,12 +173,8 @@ ipcMain.handle(IPC.DockerNukeAll, async (): Promise<IpcResponse> => {
       const list = await docker.listContainers({ all: true });
       for (const c of list) { if (!isRelatedContainer(c)) continue; try { await docker.getContainer(c.Id).remove({ force: true }); } catch {} }
     })();
-    // 删除卷
-    await (async () => {
-      const vinfo = await docker.listVolumes();
-      const vols: any[] = (vinfo?.Volumes || []);
-      for (const v of vols) { const name = String(v?.Name || ''); if (VOLUME_NAMES.includes(name)) { try { await docker.getVolume(name).remove({ force: true }); } catch {} } }
-    })();
+    // 删除卷（包含已知命名卷 + dangling 卷）
+    await removeRelatedVolumes(docker);
     // 删除网络
     await (async () => {
       const nets = await docker.listNetworks();

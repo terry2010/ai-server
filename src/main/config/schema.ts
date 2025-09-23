@@ -33,6 +33,12 @@ export interface GlobalConfig {
   autoStartDeps: boolean;
   autoSuggestNextPort: boolean;
   logToConsole?: boolean; // 是否在前端控制台输出后端执行日志
+  ui?: {
+    windowControlsMode?: 'all'|'mac'|'windows';
+    newWindowMode?: 'in_app'|'system';
+    language?: 'zh'|'en';
+    tabOrder?: string[];
+  }
 }
 
 export interface FirstRunState {

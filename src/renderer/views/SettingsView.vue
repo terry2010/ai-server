@@ -25,10 +25,18 @@
               </a-row>
               <a-row :gutter="24">
                 <a-col :span="12">
-                  <a-form-item label="语言（仅界面展示，不保存）">
+                  <a-form-item label="语言（保存后生效）">
                     <a-select v-model:value="systemLanguage">
                       <a-select-option value="zh">中文</a-select-option>
                       <a-select-option value="en">English</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="新窗口打开方式（window.open/_blank）">
+                    <a-select v-model:value="newWindowMode">
+                      <a-select-option value="in_app">程序内打开</a-select-option>
+                      <a-select-option value="system">浏览器打开</a-select-option>
                     </a-select>
                   </a-form-item>
                 </a-col>
@@ -50,6 +58,10 @@
                   </a-form-item>
                 </a-col>
               </a-row>
+              <div class="settings-actions">
+                <a-button type="primary" @click="saveSystem">保存系统设置</a-button>
+                <a-button @click="resetSystem" style="margin-left: 12px;">重置为默认</a-button>
+              </div>
             </a-form>
           </a-tab-pane>
 
@@ -282,8 +294,9 @@ const inited = ref(false)
 const hasUserEdited = ref(false)
 
 const systemSettings = ref({ name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true })
-// 仅UI展示的语言选择（当前不落库不影响行为）
+// 语言与新窗口策略（持久化）
 const systemLanguage = ref<'zh'|'en'>('zh')
+const newWindowMode = ref<'in_app'|'system'>('in_app')
 const net = ref<{ mirrors: string[]; proxyMode: 'direct'|'system'|'manual'; proxyHost?: string; proxyPort?: number }>({ mirrors: [''], proxyMode: 'direct' })
 const n8n = ref({ port: 5678, dbUrl: 'postgresql://localhost:5432/n8n', env: 'NODE_ENV=production\nN8N_BASIC_AUTH_ACTIVE=true' })
 const dify = ref({ port: 5001, dbUrl: 'postgresql://localhost:5432/dify', env: '' })
@@ -322,6 +335,9 @@ async function loadNetwork() {
       // UI 设置
       const mode = g?.ui?.windowControlsMode
       ui.value.windowControlsMode = (mode === 'mac' || mode === 'windows' || mode === 'all') ? mode : 'all'
+      // 语言与新窗口策略
+      systemLanguage.value = (g?.ui?.language === 'en' ? 'en' : 'zh')
+      newWindowMode.value = (g?.ui?.newWindowMode === 'system' ? 'system' : 'in_app')
       // Tray 设置
       debug.value.showTrayNative = !!g?.showTrayNative || !!g?.showTray // 兼容旧字段
       debug.value.showTrayCustom = !!g?.showTrayCustom
@@ -451,6 +467,22 @@ async function clearModuleData(name: 'n8n'|'dify'|'oneapi'|'ragflow') {
   } catch (e:any) {
     message.error(e?.message || '清空模块数据失败')
   }
+}
+
+// ---- 系统设置保存/重置（仅应用到 language 与 newWindowMode） ----
+async function saveSystem() {
+  try {
+    const payload = { global: { ui: { language: systemLanguage.value, newWindowMode: newWindowMode.value } } }
+    const res = await (window as any).api.invoke(IPC.ConfigSet, payload)
+    if (!res?.success) throw new Error(res?.message || '保存失败')
+    message.success('系统设置已保存，语言将应用到后续打开的模块页面')
+  } catch (e:any) {
+    message.error(e?.message || '保存失败')
+  }
+}
+function resetSystem() {
+  systemLanguage.value = 'zh'
+  newWindowMode.value = 'in_app'
 }
 
 // ---- Docker 维护：带二次确认 ----
