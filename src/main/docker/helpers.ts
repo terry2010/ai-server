@@ -324,77 +324,26 @@ export async function createOrStartContainerForModule(mod: ModuleSchema): Promis
   if (String(mod.name).toLowerCase() === 'ragflow') {
     try {
       const c = docker.getContainer(cname)
-      // 先注入一份最小可用的 nginx 配置：根指向 /ragflow/web/dist，/api 反代到 9380
+      // 仅确保前端目录存在一个占位页（其余由卷挂载的 ragflow.conf 接管），避免默认欢迎页/404
       try {
-        const write = await c.exec({ Cmd: ['sh', '-lc', [
+        const prep = await c.exec({ Cmd: ['sh', '-lc', [
           'set -e',
-          // 确保前端目录存在；若不存在则生成一个最小占位页，避免默认欢迎页 
           'mkdir -p /ragflow/web/dist',
           'if [ ! -f /ragflow/web/dist/index.html ]; then echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>RAGFlow</title></head><body><h3>RAGFlow 正在启动...</h3></body></html>" > /ragflow/web/dist/index.html; fi',
-          // 写入 nginx server 配置（使用 printf 并转义 $ 符号，避免被 shell 展开），同时兼容 conf.d 与 http.d
-          'mkdir -p /etc/nginx/conf.d /etc/nginx/http.d',
-          'printf "%s\n" \\
-"server {" \\
-"  listen 80;" \\
-"  server_name _;" \\
-"  root /ragflow/web/dist;" \\
-"  index index.html;" \\
-"  location /api/ {" \\
-"    proxy_pass http://127.0.0.1:9380/;" \\
-"    proxy_http_version 1.1;" \\
-"    proxy_set_header Host \\\\${host};" \\
-"    proxy_set_header X-Real-IP \\\\${remote_addr};" \\
-"  }" \\
-"  location / {" \\
-"    try_files \\\\${uri} \\\\${uri}/ /index.html;" \\
-"  }" \\
-"}" \\
-> /etc/nginx/conf.d/ragflow.conf',
-          'cp -f /etc/nginx/conf.d/ragflow.conf /etc/nginx/http.d/ragflow.conf || true',
-          // 删除可能存在的默认站点（不同发行版目录不同）
-          'rm -f /etc/nginx/conf.d/default.conf /etc/nginx/http.d/default.conf /etc/nginx/sites-enabled/default || true',
-          // 覆盖 nginx.conf 以确保包含 *.conf
-          'printf "%s\n" \\
-"user  root;" \\
-"worker_processes  auto;" \\
-"error_log  /var/log/nginx/error.log notice;" \\
-"pid        /var/run/nginx.pid;" \\
-"" \\
-"events {" \\
-"    worker_connections  1024;" \\
-"}" \\
-"" \\
-"http {" \\
-"    include       /etc/nginx/mime.types;" \\
-"    default_type  application/octet-stream;" \\
-"    log_format  main  '$remote_addr - $remote_user [$time_local] \"$request\" '" \\
-"                      '$status $body_bytes_sent \"$http_referer\" '" \\
-"                      '\"$http_user_agent\" \"$http_x_forwarded_for\"';" \\
-"    access_log  /var/log/nginx/access.log  main;" \\
-"    sendfile        on;" \\
-"    keepalive_timeout  65;" \\
-"    client_max_body_size 1024M;" \\
-"    include /etc/nginx/conf.d/*.conf;" \\
-"    include /etc/nginx/http.d/*.conf;" \\
-"}" \\
-> /etc/nginx/nginx.conf',
-          // 显示最终 conf 便于诊断
-          'echo "--- final /etc/nginx/nginx.conf ---"',
-          'sed -n "1,200p" /etc/nginx/nginx.conf || true',
-          'echo "--- final conf.d/ragflow.conf ---"',
-          'sed -n "1,200p" /etc/nginx/conf.d/ragflow.conf || true',
-          'echo "--- final http.d/ragflow.conf ---"',
-          'sed -n "1,200p" /etc/nginx/http.d/ragflow.conf || true',
-          'echo "--- list conf.d ---"',
-          'ls -la /etc/nginx/conf.d || true',
-          'echo "--- list http.d ---"',
-          'ls -la /etc/nginx/http.d || true',
-          'nginx -t && nginx -s reload || true'
+          'true'
         ].join('; ')], AttachStdout: true, AttachStderr: true })
-        await new Promise<void>((resolve) => { write.start({ hijack: true, stdin: false }, () => resolve()) })
-        emitOpsLog('[diag][ragflow] applied nginx conf and reloaded')
+        await new Promise<void>((resolve) => { prep.start({ hijack: true, stdin: false }, () => resolve()) })
+        emitOpsLog('[diag][ragflow] web dist ensured')
       } catch (e: any) {
-        emitOpsLog(`[diag][ragflow] apply nginx conf error: ${String(e?.message || e)}`, 'warn')
+        emitOpsLog(`[diag][ragflow] ensure web dist error: ${String(e?.message || e)}`, 'warn')
+      }
+      // 关键：在容器启动后立即尝试让 Nginx 重新加载配置，确保我们通过卷挂载的 ragflow.conf 立刻生效
+      try {
+        const reload = await c.exec({ Cmd: ['sh', '-lc', 'nginx -t && nginx -s reload || true'], AttachStdout: true, AttachStderr: true })
+        await new Promise<void>((resolve) => { reload.start({ hijack: true, stdin: false }, () => resolve()) })
+        emitOpsLog('[diag][ragflow] nginx reloaded')
+      } catch (e: any) {
+        emitOpsLog(`[diag][ragflow] nginx reload error: ${String(e?.message || e)}`, 'warn')
       }
       const info = await c.inspect()
       const pb = info?.HostConfig?.PortBindings || {}
