@@ -103,6 +103,11 @@ export const windowOpenDevTools = async (): Promise<void> => {
   if (!res?.success) throw new Error(res?.message || '打开调试窗口失败')
 }
 
+export const windowClearClientData = async (): Promise<void> => {
+  const res = await invoke(IPC.WindowClearClientData)
+  if (!res?.success) throw new Error(res?.message || '清空客户端数据失败')
+}
+
 // ---- Docker 维护 ----
 export async function dockerStopAll(): Promise<void> {
   console.log('[ipc] dockerStopAll ->')
@@ -188,6 +193,17 @@ export async function openExternal(url: string): Promise<void> {
 export async function bvLoadHome(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
   const res = await invoke(IPC.BVLoadHome, { name })
   if (!res?.success) throw new Error(res?.message || '加载模块首页失败')
+}
+
+// 打开指定模块 BrowserView 的 DevTools
+export async function bvOpenDevTools(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVOpenDevTools, { name })
+  if (!res?.success) throw new Error(res?.message || '打开模块调试窗口失败')
+}
+
+export async function bvClearData(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+  const res = await invoke(IPC.BVClearData, { name })
+  if (!res?.success) throw new Error(res?.message || '清空模块数据失败')
 }
 
 // Docker 状态/启动

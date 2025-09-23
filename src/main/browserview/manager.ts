@@ -19,6 +19,50 @@ class BrowserViewManager {
     this.updateBoundsForActive()
   }
 
+  async clearData(name: ModuleKey) {
+    try {
+      const v = this.views.get(name)
+      if (!v || v.webContents.isDestroyed()) return { success: false, message: 'view not ready' }
+      const url = v.webContents.getURL() || ''
+      if (!url) return { success: false, message: 'url empty' }
+      let origin = ''
+      try { origin = new URL(url).origin } catch {}
+      const sess = v.webContents.session
+      if (origin) {
+        await sess.clearStorageData({ origin, storages: ['cookies','localstorage','indexeddb','serviceworkers','cachestorage'] as any })
+      } else {
+        await sess.clearStorageData({ storages: ['cookies','localstorage','indexeddb','serviceworkers','cachestorage'] as any })
+      }
+      try {
+        await v.webContents.executeJavaScript(`
+          try { localStorage && localStorage.clear && localStorage.clear() } catch {}
+          try {
+            if (indexedDB && indexedDB.databases) {
+              indexedDB.databases().then(dbs => { try { dbs.forEach(d => d && d.name && indexedDB.deleteDatabase(d.name)) } catch {} })
+            }
+          } catch {}
+          true
+        `, true)
+      } catch {}
+      return { success: true }
+    } catch (e:any) {
+      return { success: false, message: e?.message || String(e) }
+    }
+  }
+
+  openDevTools(name: ModuleKey) {
+    try {
+      const v = this.views.get(name)
+      if (v && !v.webContents.isDestroyed()) {
+        v.webContents.openDevTools({ mode: 'detach' as any })
+        return { success: true }
+      }
+      return { success: false, message: 'view not ready' }
+    } catch (e: any) {
+      return { success: false, message: e?.message || String(e) }
+    }
+  }
+
   private getActiveWindow(): BrowserWindow | null {
     const wins = BrowserWindow.getAllWindows()
     return wins.find(w => !w.isDestroyed()) || null

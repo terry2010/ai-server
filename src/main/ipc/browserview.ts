@@ -28,3 +28,13 @@ ipcMain.handle(IPC.OpenExternal, async (_e, payload: { url: string }) => {
 
 ipcMain.handle(IPC.BVLoadUrl, async (_e, payload: { name: 'n8n'|'dify'|'oneapi'|'ragflow'; url: string }) => BVManager.loadUrl(payload.name, payload.url))
 ipcMain.handle(IPC.BVLoadHome, async (_e, payload: { name: 'n8n'|'dify'|'oneapi'|'ragflow' }) => BVManager.loadHome(payload.name))
+
+// 打开指定模块 BrowserView 的 DevTools
+ipcMain.handle(IPC.BVOpenDevTools, async (_e, payload: { name: 'n8n'|'dify'|'oneapi'|'ragflow' }) => {
+  return BVManager.openDevTools(payload.name)
+})
+
+// 清空指定模块 BrowserView 的数据（cookies/localstorage 等）
+ipcMain.handle(IPC.BVClearData, async (_e, payload: { name: 'n8n'|'dify'|'oneapi'|'ragflow' }) => {
+  return BVManager.clearData(payload.name)
+})

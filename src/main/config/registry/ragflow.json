@@ -20,6 +20,6 @@
     { "host": "c:\\code\\ai-server\\orchestration\\modules\\ragflow\\nginx\\ragflow.conf", "container": "/etc/nginx/http.d/ragflow.conf" },
     { "host": "c:\\code\\ai-server\\orchestration\\modules\\ragflow\\nginx\\sites-enabled-empty", "container": "/etc/nginx/sites-enabled" }
   ],
-  "healthCheck": { "type": "http", "target": "http://localhost:${RAGFLOW_PORT:18600}/api/health", "interval": 2000, "timeout": 20000, "retries": 60 },
+  "healthCheck": { "type": "http", "target": "http://localhost:${RAGFLOW_PORT:18600}/v1/system/config", "interval": 3000, "timeout": 30000, "retries": 80 },
   "compose": { "templateRef": "docker-compose.feature.yml" }
 }

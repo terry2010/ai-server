@@ -40,14 +40,30 @@ ipcMain.handle(IPC.WindowOpenDevTools, async () => {
   const win = getActiveWindow()
   if (!win) return { success: false, message: 'no window' }
   try {
-    if (!win.webContents.isDevToolsOpened()) {
-      win.webContents.openDevTools({ mode: 'detach' })
+    // 始终确保打开（即便已打开也重新触发一次，避免被手动关闭后无法再聚焦的问题）
+    try { win.webContents.closeDevTools() } catch {}
+    win.webContents.openDevTools({ mode: 'detach' })
+    // 略延迟以确保 DevTools 已创建，再去聚焦 DevTools（不再抢回主窗口焦点）
+    setTimeout(() => { try { win.webContents.devToolsWebContents?.focus?.() } catch {} }, 60)
+    return { success: true }
+  } catch (e:any) {
+    return { success: false, message: e?.message || String(e) }
+  }
+})
+
+// 清空客户端（renderer）页面的 Cookies 与 LocalStorage
+ipcMain.handle(IPC.WindowClearClientData, async () => {
+  try {
+    const { session } = require('electron')
+    // dev 环境是 Vite 5174，prod 是 file://（无 cookies/localStorage 需忽略）
+    const isDev = process.env.ELECTRON_START_URL || process.env.NODE_ENV === 'development'
+    const origin = isDev ? 'http://localhost:5174' : null
+    if (origin) {
+      await session.defaultSession.clearStorageData({ origin, storages: ['cookies','localstorage'] })
+    } else {
+      // 回退：尽量清空默认会话的 cookies 与 localstorage（不带 origin）
+      await session.defaultSession.clearStorageData({ storages: ['cookies','localstorage'] })
     }
-    // 略延迟以确保 DevTools 已创建，再去聚焦
-    setTimeout(() => {
-      try { win.webContents.devToolsWebContents?.focus?.() } catch {}
-      try { win.focus() } catch {}
-    }, 30)
     return { success: true }
   } catch (e:any) {
     return { success: false, message: e?.message || String(e) }

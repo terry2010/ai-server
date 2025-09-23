@@ -25,6 +25,16 @@
               </a-row>
               <a-row :gutter="24">
                 <a-col :span="12">
+                  <a-form-item label="语言（仅界面展示，不保存）">
+                    <a-select v-model:value="systemLanguage">
+                      <a-select-option value="zh">中文</a-select-option>
+                      <a-select-option value="en">English</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-row :gutter="24">
+                <a-col :span="12">
                   <a-form-item label="日志级别">
                     <a-select v-model:value="systemSettings.logLevel">
                       <a-select-option value="debug">Debug</a-select-option>
@@ -211,7 +221,26 @@
                 </a-radio-group>
               </a-form-item>
               <a-form-item>
-                <a-button type="primary" @click="windowOpenDevTools">打开调试窗口</a-button>
+                <a-button type="primary" @click="windowOpenDevTools">打开客户端调试窗口</a-button>
+                <a-button style="margin-left: 12px;" @click="clearClientData">清空客户端 Cookie/LocalStorage</a-button>
+              </a-form-item>
+
+              <a-form-item label="打开模块调试窗口">
+                <a-space wrap>
+                  <a-button @click="() => openModuleDevTools('n8n')">打开 n8n 调试窗口</a-button>
+                  <a-button @click="() => openModuleDevTools('dify')">打开 Dify 调试窗口</a-button>
+                  <a-button @click="() => openModuleDevTools('oneapi')">打开 OneAPI 调试窗口</a-button>
+                  <a-button @click="() => openModuleDevTools('ragflow')">打开 RagFlow 调试窗口</a-button>
+                </a-space>
+              </a-form-item>
+
+              <a-form-item label="清空模块数据（Cookie/LocalStorage）">
+                <a-space wrap>
+                  <a-button danger @click="() => clearModuleData('n8n')">清空 n8n 数据</a-button>
+                  <a-button danger @click="() => clearModuleData('dify')">清空 Dify 数据</a-button>
+                  <a-button danger @click="() => clearModuleData('oneapi')">清空 OneAPI 数据</a-button>
+                  <a-button danger @click="() => clearModuleData('ragflow')">清空 RagFlow 数据</a-button>
+                </a-space>
               </a-form-item>
 
               <a-form-item label="顶部Tab顺序">
@@ -243,7 +272,7 @@ import { ref, onMounted, watch } from 'vue'
 import { SaveOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { IPC } from '../../shared/ipc-contract'
-import { windowOpenDevTools, dockerStopAll, dockerRemoveAllContainers, dockerRemoveAllVolumes, dockerRemoveCustomNetwork, dockerNukeAll, getModuleStatus, bvRelease } from '../services/ipc'
+import { windowOpenDevTools, windowClearClientData, dockerStopAll, dockerRemoveAllContainers, dockerRemoveAllVolumes, dockerRemoveCustomNetwork, dockerNukeAll, getModuleStatus, bvRelease, bvOpenDevTools, bvClearData } from '../services/ipc'
 import { moduleStore } from '../stores/modules'
 import { clearAllPending } from '../stores/ops'
 
@@ -253,6 +282,8 @@ const inited = ref(false)
 const hasUserEdited = ref(false)
 
 const systemSettings = ref({ name: 'AI-Server 管理平台', port: 8080, logLevel: 'info', autoStart: true })
+// 仅UI展示的语言选择（当前不落库不影响行为）
+const systemLanguage = ref<'zh'|'en'>('zh')
 const net = ref<{ mirrors: string[]; proxyMode: 'direct'|'system'|'manual'; proxyHost?: string; proxyPort?: number }>({ mirrors: [''], proxyMode: 'direct' })
 const n8n = ref({ port: 5678, dbUrl: 'postgresql://localhost:5432/n8n', env: 'NODE_ENV=production\nN8N_BASIC_AUTH_ACTIVE=true' })
 const dify = ref({ port: 5001, dbUrl: 'postgresql://localhost:5432/dify', env: '' })
@@ -390,6 +421,35 @@ async function applyUiMode() {
     if (!res?.success) throw new Error(res?.message || '保存 UI 设置失败')
   } catch (e:any) {
     message.error(e?.message || '应用 UI 设置失败')
+  }
+}
+
+// ---- 打开模块 BrowserView 的 DevTools ----
+async function openModuleDevTools(name: 'n8n'|'dify'|'oneapi'|'ragflow') {
+  try {
+    await bvOpenDevTools(name)
+    message.success(`已打开 ${name} 调试窗口`)
+  } catch (e:any) {
+    message.error(e?.message || '打开模块调试窗口失败（模块页面可能尚未加载）')
+  }
+}
+
+// ---- 清空数据（Cookie/LocalStorage 等） ----
+async function clearClientData() {
+  try {
+    await windowClearClientData()
+    message.success('已清空客户端 Cookie/LocalStorage')
+  } catch (e:any) {
+    message.error(e?.message || '清空客户端数据失败')
+  }
+}
+
+async function clearModuleData(name: 'n8n'|'dify'|'oneapi'|'ragflow') {
+  try {
+    await bvClearData(name)
+    message.success(`已清空 ${name} 数据`)
+  } catch (e:any) {
+    message.error(e?.message || '清空模块数据失败')
   }
 }
 

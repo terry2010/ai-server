@@ -55,6 +55,7 @@ export const IPC = {
   BVGoForward: 'ai/bv/goForward',
   BVLoadUrl: 'ai/bv/loadUrl',
   BVLoadHome: 'ai/bv/loadHome',
+  BVOpenDevTools: 'ai/bv/openDevTools',
   OpenExternal: 'ai/system/openExternal',
   ModulesList: 'ai/modules/list',
   ModuleStart: 'ai/module/start',
@@ -80,6 +81,9 @@ export const IPC = {
   WindowGetState: 'ai/window/getState',
   WindowStateEvent: 'ai/window/stateEvent',
   WindowOpenDevTools: 'ai/window/openDevTools',
+  WindowClearClientData: 'ai/window/clearClientData',
   UIGoto: 'ai/ui/goto',
   PreloadModulePage: 'ai/ui/preloadModulePage', // 后台预加载模块页面
+  // BrowserView 数据维护
+  BVClearData: 'ai/bv/clearData',
 } as const;

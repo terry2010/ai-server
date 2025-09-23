@@ -13,6 +13,7 @@ const electronModule = require('electron');
 console.log('[main] electron keys =', Object.keys(electronModule));
 const app = electronModule.app;
 const BrowserWindow = electronModule.BrowserWindow;
+const session = electronModule.session;
 // 重置注册表缓存，确保新模块能被加载
 import { resetRegistryCache } from './config/store';
 resetRegistryCache();
@@ -80,6 +81,11 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // 优先将默认会话的 Accept-Language 设置为中文（不更改 User-Agent 本身）
+  try {
+    const ua = session.defaultSession.getUserAgent();
+    session.defaultSession.setUserAgent(ua, 'zh-CN,zh;q=0.9,en;q=0.8');
+  } catch {}
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
