@@ -51,7 +51,23 @@ function showMainWindow() {
 }
 
 async function buildContextTemplate() {
-  const mods = listModules().filter(m => ['n8n','dify','oneapi','ragflow'].includes(m.name))
+  const modsAll = listModules().filter(m => ['n8n','dify','oneapi','ragflow'].includes(m.name))
+  // 读取顶部 tab 顺序
+  const cfg = getGlobalConfig() as any
+  const order: string[] = Array.isArray(cfg?.ui?.tabOrder) ? cfg.ui.tabOrder : ['n8n','dify','oneapi','ragflow']
+  // 计算最新状态（若无缓存则获取一次），随后仅显示运行/异常，并按顺序排序
+  const statusMap: Record<string, 'running'|'stopped'|'error'|'parse_error'> = {}
+  for (const m of modsAll) {
+    let s: any = statusCache[m.name]
+    if (!s) {
+      try { const resp: any = await getModuleStatus(m.name as any); s = resp?.data?.status || 'stopped' } catch {}
+    }
+    statusMap[m.name] = (s || 'stopped')
+  }
+  const sorted = modsAll
+    .filter(m => ['running','error','parse_error'].includes(statusMap[m.name] as any))
+    .sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name))
+  const mods = sorted
   const items: any[] = []
   // banner（使用图标展示）
   const icon = getIcon()
@@ -116,6 +132,21 @@ async function buildContextTemplate() {
   }
   items.push({ type: 'separator' })
   items.push({ label: '打开主界面', click: () => showMainWindow() })
+  // 直接打开内置页面：guide / market
+  items.push({ label: '在线教程', click: () => {
+    try {
+      showMainWindow()
+      const wins = BrowserWindow.getAllWindows()
+      for (const w of wins) w.webContents.send(require('../shared/ipc-contract').IPC.UIGoto, { path: '/guide' })
+    } catch {}
+  } })
+  items.push({ label: 'AI市场', click: () => {
+    try {
+      showMainWindow()
+      const wins = BrowserWindow.getAllWindows()
+      for (const w of wins) w.webContents.send(require('../shared/ipc-contract').IPC.UIGoto, { path: '/market' })
+    } catch {}
+  } })
   items.push({ label: '系统设置', click: () => {
     try {
       showMainWindow()

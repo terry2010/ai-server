@@ -11,7 +11,7 @@
           </a-spin>
         </div>
         <div class="actions" style="margin-left:12px">
-          <a-button v-if="!docker.running" type="primary" size="small" @click="startDocker" :loading="starting || loading" :disabled="loading">启动 Docker</a-button>
+          <a-button v-if="!docker.running" size="small" @click="startDocker" :loading="starting || loading" :disabled="loading">启动 Docker</a-button>
         </div>
       </div>
 

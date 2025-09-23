@@ -156,11 +156,11 @@ export async function dockerNukeAll(): Promise<void> {
 }
 
 // ---- BrowserView 控制 ----
-export async function bvShow(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvShow(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVShow, { name })
   if (!res?.success) throw new Error(res?.message || '显示 BrowserView 失败')
 }
-export async function bvRefresh(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvRefresh(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVRefresh, { name })
   if (!res?.success) throw new Error(res?.message || '刷新 BrowserView 失败')
 }
@@ -168,7 +168,7 @@ export async function bvHideAll(): Promise<void> {
   const res = await invoke(IPC.BVHideAll)
   if (!res?.success) throw new Error(res?.message || '隐藏 BrowserView 失败')
 }
-export async function bvRelease(name?: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvRelease(name?: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVRelease, name ? { name } : undefined)
   if (!res?.success) throw new Error(res?.message || '释放 BrowserView 失败')
 }
@@ -177,11 +177,11 @@ export async function bvSetInsets(p: Partial<{ top: number; left: number; right:
   if (!res?.success) throw new Error(res?.message || '设置 BrowserView 边距失败')
 }
 
-export async function bvGoBack(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvGoBack(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVGoBack, { name })
   if (!res?.success) throw new Error(res?.message || '后退失败')
 }
-export async function bvGoForward(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvGoForward(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVGoForward, { name })
   if (!res?.success) throw new Error(res?.message || '前进失败')
 }
@@ -190,18 +190,18 @@ export async function openExternal(url: string): Promise<void> {
   if (!res?.success) throw new Error(res?.message || '调用系统浏览器失败')
 }
 
-export async function bvLoadHome(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvLoadHome(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVLoadHome, { name })
   if (!res?.success) throw new Error(res?.message || '加载模块首页失败')
 }
 
 // 打开指定模块 BrowserView 的 DevTools
-export async function bvOpenDevTools(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvOpenDevTools(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVOpenDevTools, { name })
   if (!res?.success) throw new Error(res?.message || '打开模块调试窗口失败')
 }
 
-export async function bvClearData(name: 'n8n'|'dify'|'oneapi'|'ragflow'): Promise<void> {
+export async function bvClearData(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVClearData, { name })
   if (!res?.success) throw new Error(res?.message || '清空模块数据失败')
 }

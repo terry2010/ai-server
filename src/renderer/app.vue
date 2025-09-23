@@ -7,7 +7,7 @@ import SideMenu from './components/SideMenu.vue'
 const route = useRoute()
 const showSide = computed(() => {
   const n = ((route.name as string) || '').toLowerCase()
-  const hide = ['n8n','dify','oneapi','ragflow','login','register']
+  const hide = ['n8n','dify','oneapi','ragflow','guide','market','login','register']
   return !hide.includes(n)
 })
 </script>

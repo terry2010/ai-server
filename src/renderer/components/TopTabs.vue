@@ -25,19 +25,21 @@
         @change="handleTabChange"
       >
         <a-tab-pane key="home" tab="首页" />
+        <!-- 模块类 Tabs（带状态点，可拖拽，按运行/异常过滤） -->
         <a-tab-pane v-for="mod in moduleTabs" :key="mod">
           <template #tab>
-            <span :class="['tab-content', { 'drag-over': dragOverKey===mod }]"
-                  :data-mod="mod"
-                  :draggable="true"
-                  @dragstart.stop="onDragStart(mod, $event)"
-                  @dragenter.prevent="onDragEnter(mod)"
-                  @dragover.prevent="onDragOver"
-                  @dragleave.prevent="onDragLeave(mod)"
-                  @drop.stop.prevent="onDrop(mod, $event)"
-            >
+            <span class="tab-content" :data-mod="mod">
               {{ getTabLabel(mod) }}
               <span :class="['status-indicator', getStatusClass(mod)]"></span>
+            </span>
+          </template>
+        </a-tab-pane>
+        <!-- 页面类 Tabs（guide/market）：不显示状态点，右侧显示关闭X，不参与拖拽与顺序持久化） -->
+        <a-tab-pane v-for="p in pageTabs" :key="p">
+          <template #tab>
+            <span class="tab-content" :data-mod="p">
+              {{ getTabLabel(p) }}
+              <span class="closer" title="关闭" @click.stop="closePageTab(p)">×</span>
             </span>
           </template>
         </a-tab-pane>
@@ -127,6 +129,8 @@ const defaultModules = ['n8n','dify','oneapi','ragflow'] as const
 // 维护一个“顺序”列表（包含所有模块）；实际渲染根据状态过滤
 const orderTabs = ref<string[]>([...defaultModules])
 const moduleTabs = ref<string[]>([])
+// 页面类 Tabs：在线教程、AI市场（通过路由打开/关闭）
+const pageTabs = ref<Array<'guide'|'market'>>([])
 const showMenu = ref(false)
 const menuBtn = ref<HTMLElement | null>(null)
 const isMaximized = ref(false)
@@ -153,7 +157,11 @@ const handleTabChange = (key: string) => {
 function syncTabWithRoute() {
   const name = (route.name as string) || ''
   const lower = name.toLowerCase()
-  if (['home', ...moduleTabs.value].includes(lower)) {
+  // 页面类：从路由进入时，自动加入到 pageTabs
+  if (lower === 'guide' || lower === 'market') {
+    if (!pageTabs.value.includes(lower)) pageTabs.value.push(lower)
+  }
+  if (['home', ...moduleTabs.value, ...pageTabs.value].includes(lower)) {
     activeTab.value = lower === '' ? 'home' : lower
   }
 }
@@ -267,41 +275,15 @@ const handleMinimize = () => { windowMinimize() }
 const handleMaximize = () => { windowMaximize() }
 const handleMenu = () => { /* 示例菜单通过 a-dropdown 在右侧 user-section 已体现 */ }
 
-// --- 拖拽排序 ---
-let dragKey: string | null = null
-const dragOverKey = ref<string | null>(null)
-function onDragStart(key: string, ev: DragEvent) {
-  dragKey = key
-  try {
-    ev.dataTransfer?.setData('text/plain', key)
-    if (ev.dataTransfer) { ev.dataTransfer.effectAllowed = 'move' }
-  } catch {}
-}
-function onDragEnter(key: string) { dragOverKey.value = key }
-function onDragLeave(key: string) { if (dragOverKey.value === key) dragOverKey.value = null }
-function onDragOver(ev: DragEvent) { try { if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move' } catch {} }
-function onDrop(targetKey: string, _ev: DragEvent) {
-  if (!dragKey || dragKey === targetKey) return
-  const arr = moduleTabs.value.slice()
-  const from = arr.indexOf(dragKey)
-  const to = arr.indexOf(targetKey)
-  if (from === -1 || to === -1) { dragKey = null; return }
-  arr.splice(to, 0, ...arr.splice(from, 1))
-  orderTabs.value = arr
-  recomputeVisibleTabs()
-  dragKey = null
-  dragOverKey.value = null
-  // 持久化
-  try {
-    (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } })
-  } catch {}
-}
+// --- 拖拽排序：统一由 Sortable 管理 ---
 
 function getTabLabel(k: string): string {
   if (k === 'n8n') return 'n8n'
   if (k === 'dify') return 'Dify'
   if (k === 'oneapi') return 'OneAPI'
   if (k === 'ragflow') return 'RagFlow'
+  if (k === 'guide') return '在线教程'
+  if (k === 'market') return 'AI市场'
   return k
 }
 
@@ -333,8 +315,14 @@ function initSortable() {
           if (mod) keys.push(mod)
         })
         if (keys.length > 0) {
-          orderTabs.value = keys
+          // 页面类顺序（不持久化，仅同步内存）
+          const pages = keys.filter(k => k === 'guide' || k === 'market') as Array<'guide'|'market'>
+          pageTabs.value = Array.from(new Set(pages))
+          // 模块类顺序（仅持久化模块）
+          const mods = keys.filter(k => (['n8n','dify','oneapi','ragflow'] as string[]).includes(k))
+          orderTabs.value = Array.from(new Set(mods))
           recomputeVisibleTabs()
+          // 只保存模块顺序
           try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } }) } catch {}
         }
       }
@@ -356,9 +344,24 @@ function recomputeVisibleTabs() {
   })
   moduleTabs.value = visible
   // 若当前激活的模块已不可见，切回首页
-  if (activeTab.value !== 'home' && !moduleTabs.value.includes(activeTab.value)) {
+  if (activeTab.value !== 'home' && ![...moduleTabs.value, ...pageTabs.value].includes(activeTab.value)) {
     activeTab.value = 'home'
     router.push({ name: 'home' })
+  }
+}
+
+// 关闭页面类 Tab，并释放对应 BrowserView
+async function closePageTab(key: 'guide'|'market') {
+  try {
+    // 若当前正在查看被关闭页，则先切回首页
+    if (activeTab.value === key) {
+      activeTab.value = 'home'
+      router.push({ name: 'home' })
+    }
+    // 释放对应 BrowserView（不带 name 表示释放全部，带 name 释放单个）
+    try { await (await import('../services/ipc')).bvRelease(key as any) } catch {}
+  } finally {
+    pageTabs.value = pageTabs.value.filter(x => x !== key)
   }
 }
 </script>
@@ -435,6 +438,9 @@ function recomputeVisibleTabs() {
 .status-running { background-color: var(--success-color); animation: pulse 2s infinite; box-shadow: 0 0 4px var(--success-color); }
 .status-stopped { background-color: var(--text-tertiary); }
 .status-error { background-color: var(--error-color); animation: blink 1s infinite; box-shadow: 0 0 4px var(--error-color); }
+/* 页面类 Tab 的关闭按钮样式 */
+.closer { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-weight: 700; cursor: pointer; margin-left: 6px; opacity: .7; -webkit-app-region: no-drag; }
+.closer:hover { background: rgba(0,0,0,.06); opacity: 1; }
 
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }

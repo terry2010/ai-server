@@ -56,6 +56,7 @@ export const IPC = {
   BVLoadUrl: 'ai/bv/loadUrl',
   BVLoadHome: 'ai/bv/loadHome',
   BVOpenDevTools: 'ai/bv/openDevTools',
+  BVUrlChanged: 'ai/bv/urlChanged',
   OpenExternal: 'ai/system/openExternal',
   ModulesList: 'ai/modules/list',
   ModuleStart: 'ai/module/start',

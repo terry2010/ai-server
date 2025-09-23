@@ -20,8 +20,8 @@
         <div class="notice-title">模块未运行或端口未映射</div>
         <div class="notice-desc">请返回首页启动该模块，或在设置中检查端口映射与依赖服务是否就绪。</div>
         <div class="notice-actions">
-          <a-button type="primary" size="large" @click="goHome">返回首页</a-button>
-          <a-button size="large" @click="reload">刷新</a-button>
+          <a-button type="primary" size="large" @click="goHome" disabled>返回首页</a-button>
+          <a-button size="large" @click="reload" disabled>刷新</a-button>
         </div>
       </div>
       <!-- 页面内容由主进程 BrowserView 承载，此处仅占位用于滚动条与边距 -->
@@ -96,8 +96,14 @@ async function applyInsets() {
   const el = document.querySelector('.webapp-content') as HTMLElement | null
   if (el) {
     const rect = el.getBoundingClientRect()
-    // 仅设置顶部 inset，左右/底部占满
-    await bvSetInsets({ top: Math.max(0, Math.floor(rect.top)) , left: 0, right: 0, bottom: 0 })
+    // 设置四周 inset，使 BrowserView 仅覆盖右侧内容区域
+    const top = Math.max(0, Math.floor(rect.top))
+    const left = Math.max(0, Math.floor(rect.left))
+    const winW = window.innerWidth || document.documentElement.clientWidth
+    const winH = window.innerHeight || document.documentElement.clientHeight
+    const right = Math.max(0, Math.floor(winW - rect.right))
+    const bottom = Math.max(0, Math.floor(winH - rect.bottom))
+    await bvSetInsets({ top, left, right, bottom })
   }
 }
 
@@ -133,4 +139,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', applyInsets))
 .notice-title { font-size: 18px; font-weight: 700; color: #d46b08; margin-bottom: 6px; letter-spacing: 0.5px; }
 .notice-desc { font-size: 14px; color: #874d00; opacity: 0.9; margin-bottom: 16px; }
 .notice-actions { display: flex; gap: 12px; justify-content: center; }
+/* 顶部关闭按钮的通用样式（供 TopTabs 使用） */
+.closer { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-weight: 700; cursor: pointer; margin-left: 6px; opacity: .7; }
+.closer:hover { background: rgba(0,0,0,.06); opacity: 1; }
 </style>

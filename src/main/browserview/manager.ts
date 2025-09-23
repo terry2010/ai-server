@@ -4,7 +4,7 @@ import { getModuleStatus } from '../docker/status'
 import { emitOpsLog } from '../logs/app-ops-log'
 import { IPC } from '../../shared/ipc-contract'
 
-export type ModuleKey = 'n8n' | 'dify' | 'oneapi' | 'ragflow'
+export type ModuleKey = 'n8n' | 'dify' | 'oneapi' | 'ragflow' | 'guide' | 'market'
 
 interface Insets { top: number; left: number; right: number; bottom: number }
 
@@ -85,7 +85,14 @@ class BrowserViewManager {
       v.webContents.setWindowOpenHandler(({ url }) => {
         const mode = this.newWindowMode
         if (mode === 'in_app') {
-          setTimeout(() => { try { v!.webContents.loadURL(url) } catch {} }, 0)
+          setTimeout(() => {
+            try {
+              v!.webContents.loadURL(url)
+              // 通知渲染端更新地址栏
+              const wins = BrowserWindow.getAllWindows()
+              for (const w of wins) w.webContents.send(IPC.BVUrlChanged, { name, url })
+            } catch {}
+          }, 0)
           return { action: 'deny' }
         } else {
           try { shell.openExternal(url) } catch {}
@@ -206,6 +213,11 @@ class BrowserViewManager {
           await v.webContents.loadURL(url)
           this.lastOk.set(name, true)
           try { emitOpsLog(`[bv] loadUrl success: ${name} -> ${url}`) } catch {}
+          // 通知渲染端更新地址栏
+          try {
+            const wins = BrowserWindow.getAllWindows()
+            for (const w of wins) w.webContents.send(IPC.BVUrlChanged, { name, url })
+          } catch {}
           // 广播一次运行状态以推动顶部状态点立即变色
           try {
             const wins = BrowserWindow.getAllWindows()
@@ -230,6 +242,9 @@ class BrowserViewManager {
   async loadHome(name: ModuleKey) {
     try {
       let url = ''
+      // 固定站点：guide / market
+      if (name === 'guide') url = 'https://www.baidu.com/'
+      if (name === 'market') url = 'https://www.weibo.com'
       if (name === 'dify') {
         try {
           const stWeb = await getModuleStatus('dify-web' as any)

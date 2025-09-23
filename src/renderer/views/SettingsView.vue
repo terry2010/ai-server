@@ -237,21 +237,25 @@
                 <a-button style="margin-left: 12px;" @click="clearClientData">清空客户端 Cookie/LocalStorage</a-button>
               </a-form-item>
 
-              <a-form-item label="打开模块调试窗口">
+              <a-form-item label="打开模块/页面 调试窗口">
                 <a-space wrap>
                   <a-button @click="() => openModuleDevTools('n8n')">打开 n8n 调试窗口</a-button>
                   <a-button @click="() => openModuleDevTools('dify')">打开 Dify 调试窗口</a-button>
                   <a-button @click="() => openModuleDevTools('oneapi')">打开 OneAPI 调试窗口</a-button>
                   <a-button @click="() => openModuleDevTools('ragflow')">打开 RagFlow 调试窗口</a-button>
+                  <a-button @click="() => openModuleDevTools('guide')">打开 在线教程 调试窗口</a-button>
+                  <a-button @click="() => openModuleDevTools('market')">打开 AI市场 调试窗口</a-button>
                 </a-space>
               </a-form-item>
 
-              <a-form-item label="清空模块数据（Cookie/LocalStorage）">
+              <a-form-item label="清空 BrowserView 数据（Cookie/LocalStorage）">
                 <a-space wrap>
                   <a-button danger @click="() => clearModuleData('n8n')">清空 n8n 数据</a-button>
                   <a-button danger @click="() => clearModuleData('dify')">清空 Dify 数据</a-button>
                   <a-button danger @click="() => clearModuleData('oneapi')">清空 OneAPI 数据</a-button>
                   <a-button danger @click="() => clearModuleData('ragflow')">清空 RagFlow 数据</a-button>
+                  <a-button danger @click="() => clearModuleData('guide')">清空 在线教程 数据</a-button>
+                  <a-button danger @click="() => clearModuleData('market')">清空 AI市场 数据</a-button>
                 </a-space>
               </a-form-item>
 
@@ -441,7 +445,7 @@ async function applyUiMode() {
 }
 
 // ---- 打开模块 BrowserView 的 DevTools ----
-async function openModuleDevTools(name: 'n8n'|'dify'|'oneapi'|'ragflow') {
+async function openModuleDevTools(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market') {
   try {
     await bvOpenDevTools(name)
     message.success(`已打开 ${name} 调试窗口`)
@@ -460,7 +464,7 @@ async function clearClientData() {
   }
 }
 
-async function clearModuleData(name: 'n8n'|'dify'|'oneapi'|'ragflow') {
+async function clearModuleData(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market') {
   try {
     await bvClearData(name)
     message.success(`已清空 ${name} 数据`)

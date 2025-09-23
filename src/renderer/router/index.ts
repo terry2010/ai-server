@@ -24,6 +24,9 @@ const router = createRouter({
     { path: '/dify', name: 'dify', component: WebAppView },
     { path: '/oneapi', name: 'oneapi', component: WebAppView },
     { path: '/ragflow', name: 'ragflow', component: WebAppView },
+    // 新增：在线教程、AI市场
+    { path: '/guide', name: 'guide', component: WebAppView },
+    { path: '/market', name: 'market', component: WebAppView },
     {
       path: '/logs',
       name: 'logs',
@@ -62,7 +65,7 @@ export default router
 // 路由切换后联动 BrowserView 显示/隐藏
 router.afterEach((to) => {
   const name = String(to.name || '').toLowerCase()
-  const mods = ['n8n','dify','oneapi','ragflow']
+  const mods = ['n8n','dify','oneapi','ragflow','guide','market']
   if (mods.includes(name)) bvShow(name as any)
   else bvHideAll()
 })

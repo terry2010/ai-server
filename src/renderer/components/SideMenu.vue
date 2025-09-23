@@ -20,6 +20,20 @@
       
       <a-menu-divider />
       
+      <!-- 新增：在线教程、AI市场 -->
+      <a-menu-item key="guide" class="menu-item">
+        <template #icon>
+          <file-text-outlined />
+        </template>
+        在线教程
+      </a-menu-item>
+      <a-menu-item key="market" class="menu-item">
+        <template #icon>
+          <deployment-unit-outlined />
+        </template>
+        AI市场
+      </a-menu-item>
+      <!-- 调整：系统设置移动到 AI市场 下方 -->
       <a-menu-item key="system-settings" class="menu-item">
         <template #icon>
           <setting-outlined />
@@ -87,6 +101,10 @@ const handleMenuSelect = ({ key }: { key: string }) => {
     router.push({ name: 'home' })
   } else if (key === 'system-settings') {
     router.push('/settings')
+  } else if (key === 'guide') {
+    router.push('/guide')
+  } else if (key === 'market') {
+    router.push('/market')
   } else if (key === 'logs') {
     if (String(route.name || '').toLowerCase() === 'logs') {
       window.dispatchEvent(new CustomEvent('reopen-logs'))
@@ -105,6 +123,8 @@ watch(() => route.name, (n) => {
   const name = String(n || '').toLowerCase()
   if (name === 'home') selectedKeys.value = ['dashboard']
   else if (name === 'settings') selectedKeys.value = ['system-settings']
+  else if (name === 'guide') selectedKeys.value = ['guide']
+  else if (name === 'market') selectedKeys.value = ['market']
   else if (name === 'logs') selectedKeys.value = ['logs']
   else if (name === 'monitoring') selectedKeys.value = ['monitoring']
 })
