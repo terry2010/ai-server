@@ -48,11 +48,13 @@ try {
       }
     })
 
-    // 订阅模块状态事件：当模块变为 running 且尚未预加载过时，后台加载 BrowserView
+    // 订阅模块状态事件：当模块变为 running 且尚未预加载过时，后台加载 BrowserView（仅 web 模块）
     const preloaded = new Set<string>()
+    const webModules = new Set(['n8n','dify','oneapi','ragflow'])
     api.on(IPC.ModuleStatusEvent, async (_e: any, payload: any) => {
       try {
         const name = String(payload?.name || '').toLowerCase()
+        if (!webModules.has(name)) return
         const st = payload?.status?.data?.status || payload?.status?.status
         if (!name || st !== 'running' || preloaded.has(name)) return
         await (window as any).api.invoke(IPC.BVLoadHome, { name })

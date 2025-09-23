@@ -3,12 +3,22 @@
   "type": "feature",
   "dependsOn": ["mysql", "redis", "minio", "elasticsearch"],
   "ports": [
-    { "container": 9380, "host": "${RAGFLOW_PORT:18600}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
+    { "container": 80, "host": "${RAGFLOW_PORT:18600}", "bind": "${BIND_ADDRESS:127.0.0.1}" }
   ],
   "variables": {
     "RAGFLOW_PORT": "${RAGFLOW_PORT:18600}",
-    "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}"
+    "BIND_ADDRESS": "${BIND_ADDRESS:127.0.0.1}",
+    "ES_HOST": "${ES_HOST:ai-elasticsearch}",
+    "ES_USER": "${ES_USER:elastic}",
+    "ELASTIC_PASSWORD": "${ELASTIC_PASSWORD:infini_rag_flow}",
+    "MINIO_HOST": "${MINIO_HOST:ai-minio}",
+    "MYSQL_HOST": "${MYSQL_HOST:ai-mysql}",
+    "REDIS_HOST": "${REDIS_HOST:ai-redis}"
   },
+  "volumes": [
+    { "host": "c:\\code\\ai-server\\orchestration\\modules\\ragflow\\nginx\\ragflow.conf", "container": "/etc/nginx/conf.d/ragflow.conf" },
+    { "host": "c:\\code\\ai-server\\orchestration\\modules\\ragflow\\nginx\\sites-enabled-empty", "container": "/etc/nginx/sites-enabled" }
+  ],
   "healthCheck": { "type": "http", "target": "http://localhost:${RAGFLOW_PORT:18600}/", "interval": 2000, "timeout": 20000, "retries": 30 },
   "compose": { "templateRef": "docker-compose.feature.yml" }
 }

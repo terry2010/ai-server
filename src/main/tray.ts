@@ -75,25 +75,27 @@ async function buildContextTemplate() {
     submenu.push({ label: `${pretty} - 简介：${pretty} 服务`, enabled: false })
     submenu.push({ type: 'separator' })
     if (running) {
-      submenu.push({ label: '停止', click: async () => { try { await stopModule(m.name as any); statusCache[m.name] = 'stopped'; ensureTray().catch(()=>{}) } catch {} } })
-    } else {
-      submenu.push({ label: '启动', click: async () => { 
-        try { 
-          await startModule(m.name as any); 
-          statusCache[m.name] = 'running'; 
+      submenu.push({ label: '停止', click: async () => {
+        try {
+          await stopModule(m.name as any)
+          // 不做乐观置灰，等待真实状态事件/轮询刷新
           ensureTray().catch(()=>{})
-          
+        } catch {}
+      } })
+    } else {
+      submenu.push({ label: '启动', click: async () => {
+        try {
+          await startModule(m.name as any)
+          // 不做乐观置绿，等待真实状态事件/轮询刷新
+          ensureTray().catch(()=>{})
+
           // 启动后自动在后台加载对应页面（如果从未打开过）
           try {
             const wins = BrowserWindow.getAllWindows()
-            const route = '/' + m.name.toLowerCase()
             const { IPC } = require('../shared/ipc-contract')
-            for (const w of wins) {
-              // 通知渲染进程预加载页面但不切换焦点
-              w.webContents.send(IPC.PreloadModulePage, { module: m.name })
-            }
+            for (const w of wins) w.webContents.send(IPC.PreloadModulePage, { module: m.name })
           } catch {}
-        } catch {} 
+        } catch {}
       } })
     }
     // 仅当模块运行时才显示“打开模块”

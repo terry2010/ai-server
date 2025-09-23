@@ -70,8 +70,7 @@ export function emitOpsLog(message: string, level: OpsLevel = 'info') {
 
 export function getOpsLogs(tail = 500): OpsEntry[] {
   try {
-    if (tail <= mem.length) return mem.slice(mem.length - tail)
-    // If need more than mem, try reading from files (simple implementation: read ops.log.* + ops.log)
+    // 一律合并“文件历史 + 内存”后再裁剪，避免刷新页面后看不到历史日志
     ensurePaths()
     const files: string[] = []
     for (let i = MAX_FILES; i >= 1; i--) {

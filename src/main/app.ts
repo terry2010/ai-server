@@ -35,6 +35,9 @@ function createWindow() {
     }
   });
 
+  // 关闭监听器数量限制，避免频繁 setBrowserView 导致的开发期 MaxListenersExceededWarning
+  try { (win as any).setMaxListeners?.(0) } catch {}
+
   const devServerUrl = 'http://localhost:5174';
   if (process.env.ELECTRON_START_URL || process.env.NODE_ENV === 'development') {
     win.loadURL(devServerUrl);

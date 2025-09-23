@@ -29,7 +29,9 @@ function resolveImage(mod: ModuleSchema): string | undefined {
     case 'n8n': return applyRegistryMirror('n8nio/n8n:latest')
     case 'oneapi': return applyRegistryMirror('justsong/one-api:latest')
     case 'dify': return applyRegistryMirror('langgenius/dify-api:latest')
-    case 'ragflow': return applyRegistryMirror('python:3.11-slim')
+    // ragflow 使用官方已构建的生产镜像（包含 web dist 与 entrypoint.sh）
+    // 若你在 registry 对 ragflow.image 做了自定义，将优先生效（见上）。
+    case 'ragflow': return applyRegistryMirror('infiniflow/ragflow:v0.20.5-slim')
     default:
       return undefined
   }
@@ -108,7 +110,8 @@ function resolveCommand(mod: ModuleSchema): string[] | undefined {
     case 'minio':
       return ['server', '/data', '--console-address', ':9001']
     case 'ragflow':
-      return ['sleep', 'infinity']
+      // 让镜像内的 ENTRYPOINT 生效（Dockerfile: ENTRYPOINT ["./entrypoint.sh"])；不覆盖
+      return undefined
     default:
       return undefined
   }
@@ -203,10 +206,10 @@ export async function createOrStartContainerForModule(mod: ModuleSchema): Promis
   const docker = getDocker()
   if (!docker) throw new Error('dockerode 不可用')
   const cname = `ai-${mod.name}`
-  const state = await getContainerState(cname)
   const image = resolveImage(mod)
   if (!image) throw new Error(`模块未配置镜像: ${mod.name}`)
   await ensureImage(image)
+  const state = await getContainerState(cname)
 
   // ===== 变量与端口占位解析 =====
   const dict: Record<string, string> = {}
@@ -261,7 +264,38 @@ export async function createOrStartContainerForModule(mod: ModuleSchema): Promis
       return { container: contNum, host: hostNum, bind: bindStr }
     })
     .filter((v): v is { container: number; host: number; bind: string } => !!v)
-  if (state === 'missing') {
+  // 若容器已存在但“镜像/端口映射/绑定网卡”与期望不一致，删除后重建
+  let needCreate = state === 'missing'
+  if (!needCreate) {
+    try {
+      const oldInfo = await docker.getContainer(cname).inspect()
+      const oldImage = String(oldInfo?.Config?.Image || '')
+      // 期望的端口绑定
+      const desiredBindings = resolvedPorts.length > 0 ? toPortBindings(resolvedPorts as any) : undefined
+      const desiredKeys = desiredBindings ? Object.keys(desiredBindings) : []
+      const oldBindings = (oldInfo?.HostConfig?.PortBindings || undefined) as Record<string, Array<{HostIp?: string; HostPort?: string}>> | undefined
+      const oldKeys = oldBindings ? Object.keys(oldBindings) : []
+      const sameImage = (!!oldImage && oldImage === image)
+      const sameBindingKeys = JSON.stringify(desiredKeys.sort()) === JSON.stringify(oldKeys.sort())
+      let sameBindingValues = sameBindingKeys
+      if (sameBindingKeys && desiredBindings && oldBindings) {
+        for (const k of desiredKeys) {
+          const a = (desiredBindings[k] || []).map((x: { HostIp?: string; HostPort?: string }) => `${x.HostIp||''}:${x.HostPort||''}`).sort().join(',')
+          const b = (oldBindings[k] || []).map((x: { HostIp?: string; HostPort?: string }) => `${x.HostIp||''}:${x.HostPort||''}`).sort().join(',')
+          if (a !== b) { sameBindingValues = false; break }
+        }
+      }
+      if (!sameImage || !sameBindingKeys || !sameBindingValues) {
+        const reason = !sameImage ? `image mismatch -> ${oldImage} -> ${image}` : (!sameBindingKeys ? 'port keys changed' : 'port bindings changed')
+        emitOpsLog(`[docker] recreate ${cname}: ${reason}`)
+        try { if (oldInfo?.State?.Running) await docker.getContainer(cname).stop() } catch {}
+        try { await docker.getContainer(cname).remove({ force: true }) } catch {}
+        needCreate = true
+      }
+    } catch {}
+  }
+
+  if (needCreate) {
     const createOpts: any = {
       name: cname,
       Image: image,
@@ -277,11 +311,146 @@ export async function createOrStartContainerForModule(mod: ModuleSchema): Promis
         RestartPolicy: { Name: 'unless-stopped' }
       }
     }
+    emitOpsLog(`[docker] create ${cname} with image ${image}`)
     await docker.createContainer(createOpts)
   }
   const st2 = await getContainerState(cname)
   if (st2 !== 'running') {
+    emitOpsLog(`[docker] start ${cname}`)
     await docker.getContainer(cname).start()
+  }
+
+  // ragflow 启动后做一次诊断，帮助定位 80/9380 暴露与服务监听问题
+  if (String(mod.name).toLowerCase() === 'ragflow') {
+    try {
+      const c = docker.getContainer(cname)
+      // 先注入一份最小可用的 nginx 配置：根指向 /ragflow/web/dist，/api 反代到 9380
+      try {
+        const write = await c.exec({ Cmd: ['sh', '-lc', [
+          'set -e',
+          // 确保前端目录存在；若不存在则生成一个最小占位页，避免默认欢迎页 
+          'mkdir -p /ragflow/web/dist',
+          'if [ ! -f /ragflow/web/dist/index.html ]; then echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>RAGFlow</title></head><body><h3>RAGFlow 正在启动...</h3></body></html>" > /ragflow/web/dist/index.html; fi',
+          // 写入 nginx server 配置（使用 printf 并转义 $ 符号，避免被 shell 展开），同时兼容 conf.d 与 http.d
+          'mkdir -p /etc/nginx/conf.d /etc/nginx/http.d',
+          'printf "%s\n" \\
+"server {" \\
+"  listen 80;" \\
+"  server_name _;" \\
+"  root /ragflow/web/dist;" \\
+"  index index.html;" \\
+"  location /api/ {" \\
+"    proxy_pass http://127.0.0.1:9380/;" \\
+"    proxy_http_version 1.1;" \\
+"    proxy_set_header Host \\\\${host};" \\
+"    proxy_set_header X-Real-IP \\\\${remote_addr};" \\
+"  }" \\
+"  location / {" \\
+"    try_files \\\\${uri} \\\\${uri}/ /index.html;" \\
+"  }" \\
+"}" \\
+> /etc/nginx/conf.d/ragflow.conf',
+          'cp -f /etc/nginx/conf.d/ragflow.conf /etc/nginx/http.d/ragflow.conf || true',
+          // 删除可能存在的默认站点（不同发行版目录不同）
+          'rm -f /etc/nginx/conf.d/default.conf /etc/nginx/http.d/default.conf /etc/nginx/sites-enabled/default || true',
+          // 覆盖 nginx.conf 以确保包含 *.conf
+          'printf "%s\n" \\
+"user  root;" \\
+"worker_processes  auto;" \\
+"error_log  /var/log/nginx/error.log notice;" \\
+"pid        /var/run/nginx.pid;" \\
+"" \\
+"events {" \\
+"    worker_connections  1024;" \\
+"}" \\
+"" \\
+"http {" \\
+"    include       /etc/nginx/mime.types;" \\
+"    default_type  application/octet-stream;" \\
+"    log_format  main  '$remote_addr - $remote_user [$time_local] \"$request\" '" \\
+"                      '$status $body_bytes_sent \"$http_referer\" '" \\
+"                      '\"$http_user_agent\" \"$http_x_forwarded_for\"';" \\
+"    access_log  /var/log/nginx/access.log  main;" \\
+"    sendfile        on;" \\
+"    keepalive_timeout  65;" \\
+"    client_max_body_size 1024M;" \\
+"    include /etc/nginx/conf.d/*.conf;" \\
+"    include /etc/nginx/http.d/*.conf;" \\
+"}" \\
+> /etc/nginx/nginx.conf',
+          // 显示最终 conf 便于诊断
+          'echo "--- final /etc/nginx/nginx.conf ---"',
+          'sed -n "1,200p" /etc/nginx/nginx.conf || true',
+          'echo "--- final conf.d/ragflow.conf ---"',
+          'sed -n "1,200p" /etc/nginx/conf.d/ragflow.conf || true',
+          'echo "--- final http.d/ragflow.conf ---"',
+          'sed -n "1,200p" /etc/nginx/http.d/ragflow.conf || true',
+          'echo "--- list conf.d ---"',
+          'ls -la /etc/nginx/conf.d || true',
+          'echo "--- list http.d ---"',
+          'ls -la /etc/nginx/http.d || true',
+          'nginx -t && nginx -s reload || true'
+        ].join('; ')], AttachStdout: true, AttachStderr: true })
+        await new Promise<void>((resolve) => { write.start({ hijack: true, stdin: false }, () => resolve()) })
+        emitOpsLog('[diag][ragflow] applied nginx conf and reloaded')
+      } catch (e: any) {
+        emitOpsLog(`[diag][ragflow] apply nginx conf error: ${String(e?.message || e)}`, 'warn')
+      }
+      const info = await c.inspect()
+      const pb = info?.HostConfig?.PortBindings || {}
+      emitOpsLog(`[diag][ragflow] Host PortBindings: ${JSON.stringify(pb)}`)
+      // 容器内检查 80/9380 监听与本地请求
+      const exec = await c.exec({ Cmd: ['sh', '-lc', [
+        'echo "--- listeners ---"',
+        'which ss >/dev/null 2>&1 && ss -ltnp || netstat -tlnp || true',
+        'echo "--- nginx.conf ---"',
+        'if [ -f /etc/nginx/nginx.conf ]; then sed -n "1,200p" /etc/nginx/nginx.conf; fi',
+        'echo "--- conf.d list ---"',
+        'ls -la /etc/nginx/conf.d || true',
+        'for f in /etc/nginx/conf.d/*.conf; do echo "--- conf.d:$f ---"; sed -n "1,200p" "$f"; done 2>/dev/null || true',
+        'echo "--- web dist ---"',
+        'ls -la /ragflow/web/dist 2>/dev/null || true',
+        'echo "--- curl 80 / ---"',
+        'curl -I -s -o /dev/null -w "%{http_code}" http://127.0.0.1/ || echo ERR',
+        'echo "--- curl 80 /index.html ---"',
+        'curl -I -s -o /dev/null -w "%{http_code}" http://127.0.0.1/index.html || echo ERR',
+        'echo "--- curl 80 /#/login ---"',
+        'curl -I -s -o /dev/null -w "%{http_code}" http://127.0.0.1/#/login || echo ERR',
+        'echo "--- curl 9380 /api/health ---"',
+        'curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9380/api/health || echo ERR'
+      ].join("; ")], AttachStdout: true, AttachStderr: true, Tty: false })
+      await new Promise<void>((resolve) => {
+        exec.start({ hijack: true, stdin: false }, (err: any, stream: any) => {
+          if (err) { emitOpsLog(`[diag][ragflow] exec error: ${String(err?.message || err)}`, 'warn'); return resolve() }
+          let buf = ''
+          stream.on('data', (d: Buffer) => { buf += d.toString() })
+          stream.on('end', () => { emitOpsLog(`[diag][ragflow] inside ss/curl:\n${buf}`); resolve() })
+          stream.on('error', () => resolve())
+        })
+      })
+      // 主机侧尝试访问绑定的 host 端口
+      try {
+        const entries = Object.entries(pb as any)
+        for (const [key, arr] of entries) {
+          const maps = Array.isArray(arr) ? arr as any[] : []
+          for (const m of maps) {
+            const host = (m?.HostIp && m.HostIp !== '0.0.0.0') ? m.HostIp : '127.0.0.1'
+            const port = m?.HostPort
+            const url = `http://${host}:${port}/`
+            try {
+              const res = await fetch(url as any)
+              emitOpsLog(`[diag][ragflow] host fetch ${url} -> ${res.status}`)
+            } catch (e: any) {
+              emitOpsLog(`[diag][ragflow] host fetch ${url} error: ${String(e?.message || e)}`, 'warn')
+            }
+          }
+        }
+      } catch (e: any) {
+        emitOpsLog(`[diag][ragflow] host fetch diag error: ${String(e?.message || e)}`, 'warn')
+      }
+    } catch (e: any) {
+      emitOpsLog(`[diag][ragflow] diag failed: ${String(e?.message || e)}`, 'warn')
+    }
   }
 }
 

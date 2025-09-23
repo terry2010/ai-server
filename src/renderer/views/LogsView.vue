@@ -179,9 +179,10 @@ async function loadLogs(showMsg = false) {
     console.log('[logs] loadLogs.begin ->', { module: currentModule.value, isClient: isClient.value, seq: mySeq })
     if (isClient.value) {
       // 客户端日志：先加载历史，再继续实时
-      const hist = await getClientOpsLogs(1000)
+      const hist = await getClientOpsLogs(2000)
       if (mySeq !== reqSeq) return // 丢弃过期结果
-      clientLogs.value = hist.map((h, idx) => ({ id: `${h.timestamp}-${idx}`, timestamp: h.timestamp, service: 'client', module: 'client', moduleType: 'basic', level: (h.level as any) || 'info', message: sanitize(h.message) }))
+      const sorted = [...hist].sort((a,b) => (Date.parse(b.timestamp||'')||0) - (Date.parse(a.timestamp||'')||0))
+      clientLogs.value = sorted.map((h, idx) => ({ id: `${h.timestamp}-${idx}`, timestamp: h.timestamp, service: 'client', module: 'client', moduleType: 'basic', level: (h.level as any) || 'info', message: sanitize(h.message) }))
       if (showMsg) message.success('已加载客户端历史日志')
       console.log('[logs] loadLogs.end(client) <-', { count: clientLogs.value.length, seq: mySeq })
       return
