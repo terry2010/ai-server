@@ -502,7 +502,8 @@ async function closePageTab(key: 'guide'|'market') {
 .closer { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-left: 10px; -webkit-app-region: no-drag; font-size: 14px; line-height: 1; border: none; background: transparent; color: inherit; opacity: 0.65; transition: color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base), opacity var(--transition-base); pointer-events: auto; }
 .closer:hover { background: rgba(0, 0, 0, 0.12); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05); opacity: 1; }
 .custom-tabs :deep(.ant-tabs-tab-active .closer) { color: var(--text-white); opacity: 0.8; }
-.custom-tabs :deep(.ant-tabs-tab-active .closer:hover) { background: rgba(255, 255, 255, 0.2); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.custom-tabs :deep(.ant-tabs-tab-active:hover .closer) { color: var(--text-primary); }
+.custom-tabs :deep(.ant-tabs-tab-active .closer:hover) { background: rgba(255, 255, 255, 0.2); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); color: var(--text-primary); }
 .closer:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
