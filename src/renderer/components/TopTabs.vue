@@ -481,8 +481,8 @@ async function closePageTab(key: 'guide'|'market') {
 .custom-tabs :deep(.ant-tabs-nav) { margin: 0; background: transparent; }
 .custom-tabs :deep(.ant-tabs-nav-wrap),
 .custom-tabs :deep(.ant-tabs-nav-list) { overflow: visible; }
-.custom-tabs :deep(.ant-tabs-tab) { background: transparent; border: none; border-radius: 0 0 12px 12px !important; margin-right: 8px; padding: 8px 20px; color: var(--text-secondary); font-weight: 600; transition: all var(--transition-base); position: relative; overflow: visible; min-width: 110px; justify-content: center; background-clip: padding-box; -webkit-app-region: no-drag; }
-.custom-tabs :deep(.ant-tabs-tab::before) { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, transparent 0%, rgba(0, 122, 255, 0.05) 100%); opacity: 0; transition: opacity var(--transition-base); border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; }
+.custom-tabs :deep(.ant-tabs-tab) { background: transparent; border: none; border-radius: 0 0 12px 12px !important; margin-right: 8px; padding: 8px 20px; color: var(--text-secondary); font-weight: 600; transition: all var(--transition-base); position: relative; overflow: visible; min-width: 110px; justify-content: center; background-clip: padding-box; -webkit-app-region: no-drag; z-index: 0; }
+.custom-tabs :deep(.ant-tabs-tab::before) { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, transparent 0%, rgba(0, 122, 255, 0.05) 100%); opacity: 0; transition: opacity var(--transition-base); border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; pointer-events: none; z-index: 0; }
 .custom-tabs :deep(.ant-tabs-tab:hover) { background: var(--bg-tertiary); color: var(--text-primary); }
 .custom-tabs :deep(.ant-tabs-tab:hover .ant-tabs-tab-btn) { color: var(--text-primary) !important; }
 .custom-tabs :deep(.ant-tabs-tab-active) { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: var(--text-white) !important; box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24); margin-bottom: -12px; z-index: 2000; position: relative; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !important; }
@@ -491,7 +491,7 @@ async function closePageTab(key: 'guide'|'market') {
 .custom-tabs :deep(.ant-tabs-tab-active:hover .ant-tabs-tab-btn) { color: var(--text-primary) !important; }
 .custom-tabs :deep(.ant-tabs-ink-bar) { display: none; }
 
-.tab-content { display: flex; align-items: center; gap: var(--spacing-sm); -webkit-app-region: no-drag; }
+.tab-content { display: flex; align-items: center; gap: var(--spacing-sm); -webkit-app-region: no-drag; position: relative; z-index: 1; }
 .tab-content[draggable="true"] { cursor: grab; user-select: none; }
 .tab-content.drag-over { outline: 2px dashed rgba(0,0,0,0.2); border-radius: 8px; }
 .status-indicator { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
@@ -499,8 +499,11 @@ async function closePageTab(key: 'guide'|'market') {
 .status-stopped { background-color: var(--text-tertiary); }
 .status-error { background-color: var(--error-color); animation: blink 1s infinite; box-shadow: 0 0 4px var(--error-color); }
 /* 页面类 Tab 的关闭按钮样式 */
-.closer { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-left: 10px; -webkit-app-region: no-drag; font-size: 14px; line-height: 1; background: rgba(0,0,0,.04); transition: background-color .15s ease, box-shadow .15s ease; }
-.closer:hover { background: rgba(0,0,0,.12); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
+.closer { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-left: 10px; -webkit-app-region: no-drag; font-size: 14px; line-height: 1; border: none; background: transparent; color: inherit; opacity: 0.65; transition: color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base), opacity var(--transition-base); pointer-events: auto; }
+.closer:hover { background: rgba(0, 0, 0, 0.12); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05); opacity: 1; }
+.custom-tabs :deep(.ant-tabs-tab-active .closer) { color: var(--text-white); opacity: 0.8; }
+.custom-tabs :deep(.ant-tabs-tab-active .closer:hover) { background: rgba(255, 255, 255, 0.2); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.closer:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }
