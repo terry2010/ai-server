@@ -482,10 +482,14 @@ async function closePageTab(key: 'guide'|'market') {
 .custom-tabs :deep(.ant-tabs-nav-wrap),
 .custom-tabs :deep(.ant-tabs-nav-list) { overflow: visible; }
 .custom-tabs :deep(.ant-tabs-tab) { background: transparent; border: none; border-radius: 0 0 12px 12px !important; margin-right: 8px; padding: 8px 20px; color: var(--text-secondary); font-weight: 600; transition: all var(--transition-base); position: relative; overflow: visible; min-width: 110px; justify-content: center; background-clip: padding-box; -webkit-app-region: no-drag; z-index: 0; }
+.custom-tabs :deep(.ant-tabs-tab:not(:first-child)) { height: 53px; padding: 0 24px; margin-top: -1px; }
+.custom-tabs :deep(.ant-tabs-tab:not(:first-child) .tab-content) { margin-top: 0; }
 .custom-tabs :deep(.ant-tabs-tab::before) { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, transparent 0%, rgba(0, 122, 255, 0.05) 100%); opacity: 0; transition: opacity var(--transition-base); border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; pointer-events: none; z-index: 0; }
 .custom-tabs :deep(.ant-tabs-tab:hover) { background: var(--bg-tertiary); color: var(--text-primary); }
+.custom-tabs :deep(.ant-tabs-tab:not(.ant-tabs-tab-active):hover) { background: rgba(0, 0, 0, 0.08); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04); border-bottom-left-radius: 6px !important; border-bottom-right-radius: 6px !important; height: 49px; padding: 0 22px; }
 .custom-tabs :deep(.ant-tabs-tab:hover .ant-tabs-tab-btn) { color: var(--text-primary) !important; }
-.custom-tabs :deep(.ant-tabs-tab-active) { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: var(--text-white) !important; box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24); margin-bottom: -12px; z-index: 2000; position: relative; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !important; }
+.custom-tabs :deep(.ant-tabs-tab-active) { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: var(--text-white) !重要; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22); margin-bottom: -12px; z-index: 2000; position: relative; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; border-bottom-left-radius: 12px !important; border-bottom-right-radius: 12px !重要; margin-top: 0; }
+.custom-tabs :deep(.ant-tabs-tab-active:not(:first-child)) { margin-top: -5px; border-bottom-left-radius: 6px !important; border-bottom-right-radius: 6px !important; padding: 0 26px; height: 53px; box-shadow: 0 6px 10px rgba(0, 0, 0, 0.24); }
 .custom-tabs :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) { color: var(--text-white) !important; }
 .custom-tabs :deep(.ant-tabs-tab-active:hover) { filter: brightness(0.98); }
 .custom-tabs :deep(.ant-tabs-tab-active:hover .ant-tabs-tab-btn) { color: var(--text-primary) !important; }
