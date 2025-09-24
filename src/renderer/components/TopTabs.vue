@@ -39,7 +39,7 @@
           <template #tab>
             <span class="tab-content" :data-mod="p">
               {{ getTabLabel(p) }}
-              <span class="closer" title="关闭" @click.stop="closePageTab(p)">×</span>
+              <button class="closer" type="button" title="关闭" @click.stop="closePageTab(p)" @keydown.enter.stop.prevent="closePageTab(p)" @keydown.space.stop.prevent="closePageTab(p)">×</button>
             </span>
           </template>
         </a-tab-pane>
@@ -106,9 +106,10 @@ import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import Sortable from 'sortablejs'
 import { useRouter, useRoute } from 'vue-router'
 import { moduleStore } from '../stores/modules'
-import { getModuleStatus } from '../services/ipc'
+import { getModuleStatus, bvRelease } from '../services/ipc'
 import { windowMinimize, windowMaximize, windowClose, windowGetState } from '../services/ipc'
 import { IPC } from '../../shared/ipc-contract'
+import { message } from 'ant-design-vue'
 import {
   UserOutlined,
   SettingOutlined,
@@ -343,7 +344,7 @@ function initSortable() {
         if (related && related.parentElement && related.parentElement.firstElementChild === related) return false
         return true
       },
-      onEnd() {
+      async onEnd() {
         const listEl = sortable!.el as HTMLElement
         const items = Array.from(listEl.querySelectorAll('.ant-tabs-tab')) as HTMLElement[]
         // 跳过第一个（首页），读取每个 tab 内部 .tab-content 的 data-mod
@@ -354,16 +355,30 @@ function initSortable() {
           if (mod) keys.push(mod)
         })
         if (keys.length > 0) {
+          const prevKey = orderTabs.value.join('|')
           // 页面类顺序（不持久化，仅同步内存）
           const pages = keys.filter(k => k === 'guide' || k === 'market') as Array<'guide'|'market'>
           pageTabs.value = Array.from(new Set(pages))
           // 模块类顺序（仅持久化模块）
-          const mods = keys.filter(k => (['n8n','dify','oneapi','ragflow'] as string[]).includes(k))
-          // 合并默认模块，确保未显示的模块也保持在顺序列表中
-          orderTabs.value = Array.from(new Set([...mods, ...defaultModules]))
+          const modSet = new Set(['n8n','dify','oneapi','ragflow'] as string[])
+          const draggedMods = keys.filter(k => modSet.has(k))
+          // 以当前的完整顺序为基准，将未出现在拖拽结果中的模块按原相对顺序追加，确保 4 个模块都在列表里
+          const currentFull = orderTabs.value.length ? orderTabs.value.slice() : Array.from(defaultModules)
+          const missing = currentFull.filter(k => !draggedMods.includes(k))
+          const nextOrder = [...draggedMods, ...missing]
+          orderTabs.value = nextOrder
           recomputeVisibleTabs()
           // 只保存模块顺序
-          try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } }) } catch {}
+          const nextKey = nextOrder.join('|')
+          if (nextKey !== prevKey) {
+            try {
+              await (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: nextOrder } } })
+              message.success('顶部模块顺序已保存')
+            } catch (err) {
+              console.error('[tabs] save order fail', err)
+              message.error('保存模块顺序失败')
+            }
+          }
         }
       }
     })
@@ -398,8 +413,13 @@ async function closePageTab(key: 'guide'|'market') {
       activeTab.value = 'home'
       router.push({ name: 'home' })
     }
-    // 释放对应 BrowserView（不带 name 表示释放全部，带 name 释放单个）
-    try { await (await import('../services/ipc')).bvRelease(key as any) } catch {}
+    try {
+      await bvRelease(key as any)
+      message.success(`已关闭 ${getTabLabel(key)} 页`)
+    } catch (err) {
+      console.error('[tabs] release page fail', err)
+      message.error('关闭页面失败')
+    }
   } finally {
     pageTabs.value = pageTabs.value.filter(x => x !== key)
   }
@@ -479,8 +499,8 @@ async function closePageTab(key: 'guide'|'market') {
 .status-stopped { background-color: var(--text-tertiary); }
 .status-error { background-color: var(--error-color); animation: blink 1s infinite; box-shadow: 0 0 4px var(--error-color); }
 /* 页面类 Tab 的关闭按钮样式 */
-.closer { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-weight: 700; cursor: pointer; margin-left: 6px; opacity: .7; -webkit-app-region: no-drag; }
-.closer:hover { background: rgba(0,0,0,.06); opacity: 1; }
+.closer { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-left: 10px; -webkit-app-region: no-drag; font-size: 14px; line-height: 1; background: rgba(0,0,0,.04); transition: background-color .15s ease, box-shadow .15s ease; }
+.closer:hover { background: rgba(0,0,0,.12); box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
 
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.1); } }
 @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0.3; } }

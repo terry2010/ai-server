@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc-contract';
 import { getGlobalConfig, setGlobalConfig, getFirstRunState, patchFirstRunState } from '../config/store';
-import { ensureTray } from '../tray';
+import { ensureTray, updateTrayOrder } from '../tray';
 
 ipcMain.handle(IPC.ConfigGet, async (_e, key?: string) => {
   if (!key) {
@@ -15,6 +15,10 @@ ipcMain.handle(IPC.ConfigGet, async (_e, key?: string) => {
 ipcMain.handle(IPC.ConfigSet, async (_e, payload: { global?: Record<string, any>; firstRun?: Record<string, any> }) => {
   if (payload?.global) setGlobalConfig(payload.global as any);
   if (payload?.firstRun) patchFirstRunState(payload.firstRun as any);
+  try {
+    const order = payload?.global?.ui?.tabOrder;
+    updateTrayOrder(Array.isArray(order) ? order : undefined);
+  } catch {}
   try { ensureTray(); } catch {}
   // 应用 UI 设置：Accept-Language 与 新窗口打开策略
   try {

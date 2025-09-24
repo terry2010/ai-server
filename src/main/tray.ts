@@ -6,6 +6,7 @@ import { getModuleStatus } from './docker/status'
 
 let tray: Tray | null = null
 let lastMenuJSON = ''
+let runtimeOrder: string[] | null = null
 const statusCache: Record<string, 'running'|'stopped'|'error'|'parse_error'|undefined> = {}
 
 // 加载状态点图标（从文件加载，支持高DPI）
@@ -54,7 +55,8 @@ async function buildContextTemplate() {
   const modsAll = listModules().filter(m => ['n8n','dify','oneapi','ragflow'].includes(m.name))
   // 读取顶部 tab 顺序
   const cfg = getGlobalConfig() as any
-  const order: string[] = Array.isArray(cfg?.ui?.tabOrder) ? cfg.ui.tabOrder : ['n8n','dify','oneapi','ragflow']
+  const persisted: string[] = Array.isArray(cfg?.ui?.tabOrder) ? cfg.ui.tabOrder : ['n8n','dify','oneapi','ragflow']
+  const order: string[] = Array.isArray(runtimeOrder) && runtimeOrder.length ? runtimeOrder : persisted
   // 计算最新状态（若无缓存则获取一次），随后仅显示运行/异常，并按顺序排序
   const statusMap: Record<string, 'running'|'stopped'|'error'|'parse_error'> = {}
   for (const m of modsAll) {
@@ -66,7 +68,11 @@ async function buildContextTemplate() {
   }
   const sorted = modsAll
     .filter(m => ['running','error','parse_error'].includes(statusMap[m.name] as any))
-    .sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name))
+    .sort((a, b) => {
+      const ia = order.indexOf(a.name); const ib = order.indexOf(b.name)
+      const sa = ia >= 0 ? ia : 999; const sb = ib >= 0 ? ib : 999
+      return sa - sb
+    })
   const mods = sorted
   const items: any[] = []
   // banner（使用图标展示）
@@ -186,6 +192,11 @@ export async function ensureTray() {
   // 直接重建右键菜单，避免因为 JSON 序列化丢失函数/NativeImage 导致签名一致而不刷新
   tray.setContextMenu(Menu.buildFromTemplate(template))
   lastMenuJSON = ''
+}
+
+export function updateTrayOrder(order?: string[]) {
+  if (Array.isArray(order) && order.length) runtimeOrder = [...order]
+  else runtimeOrder = null
 }
 
 // 周期性刷新状态（轻量轮询）

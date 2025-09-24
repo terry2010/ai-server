@@ -15,7 +15,7 @@
     "PLUGIN_REMOTE_INSTALLING_PORT": "5003",
     "REDIS_HOST": "ai-redis",
     "REDIS_PORT": "6379",
-    "REDIS_PASSWORD": "",
+    "REDIS_PASSWORD": "${REDIS_PASSWORD:infini_rag_flow}",
     "PLUGIN_WORKING_PATH": "/app/storage/cwd",
     "PLUGIN_STORAGE_TYPE": "local",
     "PLUGIN_STORAGE_LOCAL_ROOT": "/app/storage",

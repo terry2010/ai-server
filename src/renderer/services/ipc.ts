@@ -158,11 +158,17 @@ export async function dockerNukeAll(): Promise<void> {
 // ---- BrowserView 控制 ----
 export async function bvShow(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVShow, { name })
-  if (!res?.success) throw new Error(res?.message || '显示 BrowserView 失败')
+  if (!res?.success) {
+    if (res?.message === 'navigated away') return
+    throw new Error(res?.message || '显示 BrowserView 失败')
+  }
 }
 export async function bvRefresh(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVRefresh, { name })
-  if (!res?.success) throw new Error(res?.message || '刷新 BrowserView 失败')
+  if (!res?.success) {
+    if (res?.message === 'navigated away') return
+    throw new Error(res?.message || '刷新 BrowserView 失败')
+  }
 }
 export async function bvHideAll(): Promise<void> {
   const res = await invoke(IPC.BVHideAll)
@@ -192,7 +198,10 @@ export async function openExternal(url: string): Promise<void> {
 
 export async function bvLoadHome(name: 'n8n'|'dify'|'oneapi'|'ragflow'|'guide'|'market'): Promise<void> {
   const res = await invoke(IPC.BVLoadHome, { name })
-  if (!res?.success) throw new Error(res?.message || '加载模块首页失败')
+  if (!res?.success) {
+    if (res?.message === 'navigated away') return
+    throw new Error(res?.message || '加载模块首页失败')
+  }
 }
 
 // 打开指定模块 BrowserView 的 DevTools

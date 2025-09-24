@@ -87,7 +87,14 @@ export function getGlobalConfig(): GlobalConfig {
 
 export function setGlobalConfig(patch: Partial<GlobalConfig>) {
   const cur = readJsonSafe(GLOBAL_CONFIG_FILE()) || {};
-  const next = { ...cur, global: { ...(cur.global || {}), ...patch } };
+  const curGlobal = cur.global || {};
+  const nextGlobal: any = { ...curGlobal, ...patch };
+  if (patch && typeof patch === 'object' && 'ui' in patch) {
+    const curUi = curGlobal.ui || {};
+    const patchUi = (patch as any).ui || {};
+    nextGlobal.ui = { ...curUi, ...patchUi };
+  }
+  const next = { ...cur, global: nextGlobal };
   fs.writeFileSync(GLOBAL_CONFIG_FILE(), JSON.stringify(next, null, 2));
 }
 
