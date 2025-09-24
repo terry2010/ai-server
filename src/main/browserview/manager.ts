@@ -14,6 +14,8 @@ class BrowserViewManager {
   private insets: Insets = { top: 60, left: 0, right: 0, bottom: 0 }
   private lastOk: Map<ModuleKey, boolean> = new Map()
   private newWindowMode: 'in_app' | 'system' = 'in_app'
+  // 当前渲染端期望展示的目标（由路由驱动）。用于规避异步加载完成后误挂载覆盖首页
+  private currentTarget: ModuleKey | null = null
 
   setInsets(insets: Partial<Insets>) {
     this.insets = { ...this.insets, ...insets }
@@ -141,13 +143,20 @@ class BrowserViewManager {
   async show(name: ModuleKey) {
     const win = this.getActiveWindow()
     if (!win) return { success: false, message: 'no window' }
+    // 记录最新目标
+    this.currentTarget = name
     const v = await this.ensureView(name)
     // 确保就绪（如需则带重试加载）
     const res = await this.ensureReady(name)
     if (res?.success) {
-      win.setBrowserView(v)
-      this.setViewBounds(win, v)
-      return { success: true }
+      // 再次确认目标未变更，避免在用户快速切换到首页后误挂载
+      if (this.currentTarget === name) {
+        win.setBrowserView(v)
+        this.setViewBounds(win, v)
+        return { success: true }
+      } else {
+        return { success: false, message: 'navigated away' }
+      }
     } else {
       // 未就绪（例如模块未启动/无URL），不挂载BrowserView，让渲染端空态显示
       try { win.setBrowserView(null as any) } catch {}
@@ -158,6 +167,8 @@ class BrowserViewManager {
   hideAll() {
     const win = this.getActiveWindow()
     if (!win) return { success: false, message: 'no window' }
+    // 清空目标，阻止后续 show(name) 的异步回调误挂载
+    this.currentTarget = null
     try { win.setBrowserView(null as any) } catch {}
     return { success: true }
   }

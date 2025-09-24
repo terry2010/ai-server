@@ -183,11 +183,9 @@ export async function ensureTray() {
     } catch {}
   }
   const template = await buildContextTemplate()
-  const json = JSON.stringify(template)
-  if (json !== lastMenuJSON) {
-    tray.setContextMenu(Menu.buildFromTemplate(template))
-    lastMenuJSON = json
-  }
+  // 直接重建右键菜单，避免因为 JSON 序列化丢失函数/NativeImage 导致签名一致而不刷新
+  tray.setContextMenu(Menu.buildFromTemplate(template))
+  lastMenuJSON = ''
 }
 
 // 周期性刷新状态（轻量轮询）

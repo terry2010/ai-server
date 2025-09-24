@@ -135,6 +135,10 @@ const showMenu = ref(false)
 const menuBtn = ref<HTMLElement | null>(null)
 const isMaximized = ref(false)
 const windowControlsMode = ref<'all'|'mac'|'windows'>('all')
+// 错误态去抖：错误需持续到某时间点才展示，避免短暂网络/探测抖动
+const errTimers: Record<string, number> = {}
+const errDeadline: Record<string, number> = {}
+let dotsTimer: number | null = null
 
 // 模拟用户信息
 const userInfo = ref({
@@ -143,8 +147,33 @@ const userInfo = ref({
 })
 
 const getStatusClass = (service: string) => {
-  const status = (moduleStore.dots as any)[service] || 'loading'
+  const status = (moduleStore.dots as any)[service] || 'stopped'
   return `status-${status}`
+}
+
+// 统一设置模块状态（含错误态去抖：需稳定5秒）
+function setModuleDot(name: string, raw: any) {
+  const v = raw === 'parse_error' ? 'error' : (raw || 'stopped')
+  if (v === 'error') {
+    // 5秒后若仍是错误再落盘
+    const now = Date.now()
+    errDeadline[name] = now + 5000
+    if (errTimers[name]) window.clearTimeout(errTimers[name])
+    errTimers[name] = window.setTimeout(() => {
+      if (Date.now() >= (errDeadline[name] || 0)) {
+        (moduleStore.dots as any)[name] = 'error'
+        recomputeVisibleTabs()
+      }
+    }, 5100)
+  } else {
+    // running/stopped 立即落盘并清理错误定时
+    if (errTimers[name]) { window.clearTimeout(errTimers[name]); delete errTimers[name] }
+    delete errDeadline[name]
+    if ((moduleStore.dots as any)[name] !== v) {
+      (moduleStore.dots as any)[name] = v
+      recomputeVisibleTabs()
+    }
+  }
 }
 
 const handleTabChange = (key: string) => {
@@ -221,8 +250,7 @@ onMounted(() => {
       const resp = payload?.status
       if (!name || !resp?.success) return
       const st = resp.data as any
-      ;(moduleStore.dots as any)[name] = (st.status === 'parse_error' ? 'error' : st.status)
-      recomputeVisibleTabs()
+      setModuleDot(name, st.status)
     }
     ;(window as any).api.on(IPC.ModuleStatusEvent, onStatus)
     onBeforeUnmount(() => {
@@ -241,18 +269,29 @@ onMounted(async () => {
     try {
       const resp = await getModuleStatus(n as any)
       const st = (resp as any)?.status
-      ;(moduleStore.dots as any)[n] = st === 'parse_error' ? 'error' : (st || 'stopped')
+      setModuleDot(n, st)
     } catch {}
   }
-  recomputeVisibleTabs()
   // 初始化 Sortable 拖拽
   setTimeout(initSortable, 0)
   // 监听重置顺序事件
   window.addEventListener('ui-reset-tab-order', resetTabOrder)
+  // 增加轻量轮询，避免外部启动模块后顶部未及时出现
+  dotsTimer = window.setInterval(async () => {
+    const names: string[] = ['n8n','dify','oneapi','ragflow']
+    for (const n of names) {
+      try {
+        const resp = await getModuleStatus(n as any)
+        const st = (resp as any)?.status
+        setModuleDot(n, st)
+      } catch {}
+    }
+  }, 8000)
 })
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 onBeforeUnmount(() => {
   try { window.removeEventListener('ui-reset-tab-order', resetTabOrder) } catch {}
+  if (dotsTimer) { window.clearInterval(dotsTimer); dotsTimer = null }
 })
 
 const handleUserMenuClick = ({ key }: { key: string }) => {
@@ -320,7 +359,8 @@ function initSortable() {
           pageTabs.value = Array.from(new Set(pages))
           // 模块类顺序（仅持久化模块）
           const mods = keys.filter(k => (['n8n','dify','oneapi','ragflow'] as string[]).includes(k))
-          orderTabs.value = Array.from(new Set(mods))
+          // 合并默认模块，确保未显示的模块也保持在顺序列表中
+          orderTabs.value = Array.from(new Set([...mods, ...defaultModules]))
           recomputeVisibleTabs()
           // 只保存模块顺序
           try { (window as any).api.invoke(IPC.ConfigSet, { global: { ui: { tabOrder: orderTabs.value } } }) } catch {}
