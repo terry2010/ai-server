@@ -1,5 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowRight, ChevronLeft, ChevronRight, Clock, Cpu, Database, MemoryStick, Network, Server } from 'lucide-react'
+import {
+  Activity,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Cpu,
+  Database,
+  ExternalLink,
+  FileText,
+  MemoryStick,
+  Network,
+  Play,
+  Server,
+  Square,
+} from 'lucide-react'
 import { GlassCard } from '@/components/GlassCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,6 +35,12 @@ export interface ServiceModule {
   description: string
   status: ServiceStatus
   metrics: ServiceMetrics
+}
+
+const statusPillStyles: Record<ServiceStatus, string> = {
+  running: 'bg-emerald-50 text-emerald-700',
+  stopped: 'bg-slate-100 text-slate-600',
+  error: 'bg-red-50 text-red-700',
 }
 
 const initialServices: ServiceModule[] = [
@@ -241,44 +262,55 @@ export function DashboardPage() {
         </div>
       </GlassCard>
 
-      <GlassCard className="flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-        <div className="flex items-center gap-4 text-xs text-slate-700 dark:text-slate-200">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-700 shadow-md shadow-sky-200/80">
-              <Server className="h-4 w-4" />
-            </span>
-            <div>
-              <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Docker 服务</div>
-              <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                {dockerRunning ? '已启动' : '未启动'}
+      <GlassCard className="flex items-center justify-between gap-3 rounded-2xl px-4 py-2">
+        <div className="flex items-center gap-4 text-[11px] text-slate-700 dark:text-slate-200">
+          <div className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-sky-50 px-3 py-1 border border-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(148,163,184,0.45)] dark:bg-slate-900/60 dark:border-slate-700/70 dark:shadow-[inset_0_1px_0_rgba(148,163,184,0.7),inset_0_-1px_0_rgba(15,23,42,0.9)]">
+            <span className="uppercase tracking-wide text-slate-500 dark:text-slate-400">Docker 服务</span>
+            <div className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-100">
+              <div className="group relative inline-flex items-center">
+                <StatusDot
+                  status={dockerRunning ? 'running' : 'stopped'}
+                  className="cursor-pointer"
+                />
+                <div className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-md bg-slate-900/90 px-2 py-1 text-[10px] text-slate-50 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 dark:bg-slate-100 dark:text-slate-900">
+                  {dockerRunning
+                    ? 'Docker 当前运行中，可以管理和监控容器'
+                    : 'Docker 未运行，请先在本机启动 Docker Desktop'}
+                </div>
               </div>
+              <span>{dockerRunning ? '运行中' : '未运行'}</span>
             </div>
           </div>
 
-          <div className="hidden items-center gap-3 sm:flex">
+          <div className="hidden items-center gap-2 sm:flex">
             <OverviewPill icon={Cpu} label="运行服务" value={`${runningCount} / ${services.length}`} />
             <OverviewPill icon={Clock} label="平台运行" value="02:15:32" />
-            <OverviewPill icon={Network} label="网络" value="bridge" />
+            <div className="hidden lg:block">
+              <OverviewPill icon={Network} label="网络" value="bridge" />
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" shine className="text-xs">
+          <Button size="sm" variant="outline" shine className="text-[11px]">
             刷新状态
           </Button>
-          <Button size="sm" shine className="text-xs">
+          <Button
+            size="sm"
+            shine
+            className="text-[11px] bg-gradient-to-r from-sky-500 to-sky-400 text-white shadow-lg shadow-sky-300/80 hover:shadow-xl hover:-translate-y-0.5"
+          >
             启动所有服务
           </Button>
         </div>
       </GlassCard>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {services.map((service) => (
           <Card
             key={service.key}
             className="relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-2xl hover:bg-slate-50/100 dark:hover:bg-slate-800/90"
           >
-            <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/10" />
             <CardHeader>
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -293,7 +325,9 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1 text-xs">
-                  <div className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700">
+                  <div
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${statusPillStyles[service.status]}`}
+                  >
                     <StatusDot status={service.status} />
                     <span>
                       {service.status === 'running'
@@ -319,17 +353,29 @@ export function DashboardPage() {
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant={service.status === 'running' ? 'destructive' : 'default'}
                     className="px-3 text-[11px]"
                     onClick={() => handleToggleService(service.key)}
                   >
-                    {service.status === 'running' ? '停止' : '启动'}
+                    {service.status === 'running' ? (
+                      <>
+                        <Square className="mr-1 h-3 w-3" />
+                        停止
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-1 h-3 w-3" />
+                        启动
+                      </>
+                    )}
                   </Button>
-                  <Button size="sm" variant="subtle" className="px-3 text-[11px]">
+                  <Button size="sm" variant="outline" className="px-3 text-[11px]">
+                    <ExternalLink className="mr-1 h-3 w-3" />
                     打开
                   </Button>
                 </div>
                 <Button size="sm" variant="ghost" className="px-2 text-[11px] text-slate-500">
+                  <FileText className="mr-1 h-3 w-3" />
                   查看日志
                 </Button>
               </div>
@@ -349,13 +395,10 @@ interface OverviewPillProps {
 
 function OverviewPill({ icon: Icon, label, value }: OverviewPillProps) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-slate-700">
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-        <Icon className="h-3.5 w-3.5" />
-      </span>
-      <div className="leading-tight">
-        <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
-        <div className="text-xs font-semibold text-slate-800">{value}</div>
+    <div className="flex items-center rounded-xl bg-sky-50 px-3 py-1 text-[11px] text-slate-700 border border-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(148,163,184,0.45)] dark:bg-slate-900/60 dark:border-slate-700/70 dark:shadow-[inset_0_1px_0_rgba(148,163,184,0.7),inset_0_-1px_0_rgba(15,23,42,0.9)]">
+      <div className="flex items-baseline gap-1">
+        <span className="text-[11px] text-slate-500">{label}</span>
+        <span className="font-semibold text-slate-800">{value}</span>
       </div>
     </div>
   )

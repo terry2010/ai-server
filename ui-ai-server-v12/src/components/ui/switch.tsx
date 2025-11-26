@@ -17,15 +17,17 @@ export const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         aria-checked={checked}
         onClick={() => onCheckedChange?.(!checked)}
         className={cn(
-          'relative inline-flex h-5 w-9 items-center rounded-full border border-white/40 bg-white/60 px-0.5 transition-colors duration-150',
-          checked ? 'bg-primary/90' : 'bg-slate-300/80',
+          'relative inline-flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+          checked
+            ? 'bg-primary/90 border-primary/80'
+            : 'bg-slate-200/90 border-slate-300 dark:bg-slate-700 dark:border-slate-500',
           className,
         )}
         {...props}
       >
         <span
           className={cn(
-            'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-150',
+            'inline-block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-150 dark:bg-slate-50',
             checked ? 'translate-x-4' : 'translate-x-0',
           )}
         />

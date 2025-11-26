@@ -21,8 +21,6 @@ const topTabs: TopTab[] = [
   { key: 'dify', label: 'Dify', path: '/dify', status: 'stopped' },
   { key: 'oneapi', label: 'OneAPI', path: '/oneapi', status: 'running' },
   { key: 'ragflow', label: 'RagFlow', path: '/ragflow', status: 'error' },
-  { key: 'logs', label: '系统日志', path: '/logs' },
-  { key: 'monitoring', label: '性能监控', path: '/monitoring' },
 ]
 
 export function AppLayout() {
@@ -39,11 +37,11 @@ export function AppLayout() {
         'dark:bg-slate-950 dark:text-slate-50',
       )}
     >
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),transparent_55%)] dark:hidden" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.22),transparent_55%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.16),transparent_55%)] dark:hidden" />
       <div className="pointer-events-none fixed inset-0 hidden bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.32),transparent_55%)] dark:block" />
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="fixed inset-x-0 top-0 z-30 h-14 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70">
-          <div className="mx-auto flex h-full max-w-6xl items-center gap-4 px-4">
+          <div className="flex h-full w-full items-center gap-4 px-4">
             <button
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-sm font-semibold text-slate-50 shadow-sm lg:hidden"
               onClick={() => setMobileOpen((v) => !v)}
@@ -62,7 +60,7 @@ export function AppLayout() {
               </div>
             </div>
 
-            <nav className="hidden flex-1 items-center lg:flex">
+            <nav className="hidden items-center lg:flex">
               <div className="flex items-center gap-1 rounded-full border border-white/60 bg-white/80 p-1 text-xs font-medium text-slate-600 shadow-sm shadow-black/5 backdrop-blur-xl dark:border-white/15 dark:bg-slate-900/70 dark:text-slate-200">
                 {topTabs.map((tab) => {
                   const isActive = location.pathname === tab.path
@@ -113,7 +111,7 @@ export function AppLayout() {
         </header>
 
         <div className="flex flex-1 pt-14">
-          <aside className="fixed bottom-4 left-4 top-20 hidden w-60 lg:block">
+          <aside className="fixed bottom-4 left-4 top-20 z-20 hidden w-60 lg:block">
             <GlassCard className="flex h-full flex-col rounded-2xl p-3 text-sm text-slate-800 dark:text-slate-200">
               <div className="mb-2 flex items-center justify-between px-2">
                 <div>
@@ -137,7 +135,6 @@ export function AppLayout() {
 
           {mobileOpen && (
             <div className="fixed inset-0 z-20 flex lg:hidden">
-              <div className="flex-1 bg-slate-900/20 dark:bg-slate-950/60" onClick={() => setMobileOpen(false)} />
               <div className="pointer-events-auto flex w-64 flex-col bg-white/95 px-3 pb-4 pt-20 text-slate-800 shadow-xl shadow-black/40 dark:bg-slate-900/95 dark:text-slate-200">
                 <nav className="text-sm text-slate-800 dark:text-slate-200">
                   <div className="mt-2 flex flex-col gap-1 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1 font-medium shadow-sm shadow-black/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/40">
@@ -150,6 +147,7 @@ export function AppLayout() {
                   </div>
                 </nav>
               </div>
+              <div className="flex-1 bg-slate-900/20 dark:bg-slate-950/60" onClick={() => setMobileOpen(false)} />
             </div>
           )}
 

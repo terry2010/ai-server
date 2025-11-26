@@ -241,7 +241,7 @@ function ModuleSettings({ moduleKey }: ModuleSettingsProps) {
         <Field label="环境变量" description="一行一个，支持 KEY=VALUE 格式。">
           <textarea
             rows={4}
-            className="w-full rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-xs font-mono text-slate-900 shadow-sm outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+            className="w-full rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-xs font-mono text-slate-900 shadow-sm outline-none placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-0"
             placeholder="OPENAI_API_KEY=sk-...&#10;HTTP_PROXY=http://127.0.0.1:7890"
           />
         </Field>
@@ -276,12 +276,12 @@ function DebugSettings({ onDangerClick }: DebugSettingsProps) {
           </Field>
         </div>
 
-        <div className="mt-2 space-y-2 rounded-xl border border-red-400/40 bg-red-50/70 px-3 py-3 text-xs text-red-900">
+        <div className="mt-2 space-y-2 rounded-xl border border-red-400/40 bg-red-50/80 px-3 py-3 text-xs text-red-900 dark:border-red-500/50 dark:bg-red-950/40 dark:text-red-100">
           <div className="mb-1 flex items-center gap-2 text-xs font-semibold">
-            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+            <AlertTriangle className="h-3.5 w-3.5 text-red-500 dark:text-red-300" />
             危险操作
           </div>
-          <p className="text-[11px] text-red-800/90">
+          <p className="text-[11px] text-red-800/90 dark:text-red-100/80">
             以下操作会直接对容器和数据卷产生影响，请在确认已经备份数据后再执行。
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
