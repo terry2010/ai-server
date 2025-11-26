@@ -312,7 +312,7 @@ export function LogsPage() {
             <Select value={moduleFilter} onValueChange={(v) => setModuleFilter(v as any)}>
               <SelectTrigger className="h-8 w-28">
                 {moduleFilter === 'all'
-                  ? '全部模块'
+                  ? '选择模块'
                   : moduleFilter === 'client'
                   ? 'client'
                   : moduleFilter === 'n8n'
@@ -324,7 +324,7 @@ export function LogsPage() {
                   : 'RagFlow'}
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">全部模块</SelectItem>
+                <SelectItem value="all">全部</SelectItem>
                 <SelectItem value="client">client</SelectItem>
                 <SelectItem value="n8n">n8n</SelectItem>
                 <SelectItem value="dify">Dify</SelectItem>
@@ -334,10 +334,10 @@ export function LogsPage() {
             </Select>
             <Select value={levelFilter} onValueChange={(v) => setLevelFilter(v as LogLevel | 'all')}>
               <SelectTrigger className="h-8 w-28">
-                {levelFilter === 'all' ? '全部级别' : levelFilter}
+                {levelFilter === 'all' ? '选择日志级别' : levelFilter}
               </SelectTrigger>
-              <SelectContent side="top">
-                <SelectItem value="all">全部级别</SelectItem>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
                 <SelectItem value="error">error</SelectItem>
                 <SelectItem value="warn">warn</SelectItem>
                 <SelectItem value="info">info</SelectItem>
