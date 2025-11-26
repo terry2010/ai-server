@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, BookOpenText, Store, Settings2, Activity, TerminalSquare, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
@@ -27,6 +27,7 @@ export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const [theme, setTheme] = useTheme()
+  const navigate = useNavigate()
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark')
 
@@ -96,7 +97,16 @@ export function AppLayout() {
                   <Moon className="h-4 w-4 text-slate-700" />
                 )}
               </Button>
-              <Button variant="ghost" size="icon" shine aria-label="全局设置">
+              <Button
+                variant="ghost"
+                size="icon"
+                shine
+                aria-label="全局设置"
+                onClick={() => {
+                  setMobileOpen(false)
+                  navigate('/settings')
+                }}
+              >
                 <Settings2 className="h-4 w-4" />
               </Button>
               <GlassCard className="flex items-center gap-2 rounded-full px-2 py-1.5">

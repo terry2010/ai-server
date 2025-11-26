@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-export type ServiceStatus = 'running' | 'stopped' | 'error'
+export type ServiceStatus = 'running' | 'stopped' | 'starting' | 'stopping' | 'error'
 
 export interface StatusDotProps {
   status: ServiceStatus
@@ -14,6 +14,8 @@ export function StatusDot({ status, className }: StatusDotProps) {
   const colorByStatus: Record<ServiceStatus, string> = {
     running: 'bg-gradient-to-r from-emerald-400 to-sky-400 animate-pulse',
     stopped: 'bg-slate-400',
+    starting: 'bg-gradient-to-r from-amber-300 to-amber-400 animate-pulse',
+    stopping: 'bg-slate-400 animate-pulse',
     error: 'bg-destructive animate-status-error',
   }
 
